@@ -1,0 +1,56 @@
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+flash_backend/venv/
+
+# ----- Django / local data -----
+*.sqlite3
+*.sqlite3-journal
+media/
+staticfiles/
+local_settings.py
+
+# Secrets and local config (use .env files; see README)
+.env
+.env.*
+!.env.example
+
+# ----- Testing / coverage -----
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.tox/
+.nox/
+
+# ----- Logs -----
+*.log
+logs/
+
+# ----- OS -----
+.DS_Store
+Thumbs.db
+
+# ----- Editors -----
+*.swp
+*.swo
+*~
+.idea/
+
+# ----- Expo / Metro (also see flash-app/.gitignore) -----
+# Build outputs if generated at repo root
+dist/
+web-build/
