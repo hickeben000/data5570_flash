@@ -1,0 +1,7 @@
+# Python dependencies for the Flash backend (Django + DRF).
+# Install from the repository root:
+#   python3 -m venv flash_backend/venv
+#   source flash_backend/venv/bin/activate   # Windows: flash_backend\venv\Scripts\activate
+#   pip install -r requirements.txt
+
+-r flash_backend/requirements.txt
