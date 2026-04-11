@@ -4,6 +4,7 @@ from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
 
 from .ai_utils import generate_flashcards, generate_quiz
 from .models import (
@@ -60,12 +61,18 @@ class LoginView(APIView):
 
 class CourseViewSet(viewsets.ModelViewSet):
     serializer_class = CourseSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        return Course.objects.filter(user=self.request.user)
+        if self.request.user.is_authenticated:
+            return Course.objects.filter(user=self.request.user)
+        return Course.objects.all()
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        if self.request.user.is_authenticated:
+            serializer.save(user=self.request.user)
+        else:
+            serializer.save()
 
 
 # ──────────────────────────── Documents ───────────────────────
