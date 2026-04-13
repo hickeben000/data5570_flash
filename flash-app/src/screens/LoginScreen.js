@@ -19,7 +19,7 @@ export default function LoginScreen({ navigation }) {
   const handleLogin = () => {
     dispatch(loginUser({ username, password })).then((action) => {
       if (action.meta.requestStatus === "fulfilled") {
-        navigation.replace("Home");
+        navigation.replace("MainApp");
       }
     });
   };

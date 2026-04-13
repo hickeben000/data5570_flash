@@ -1,118 +1,122 @@
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
   View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
 } from "react-native";
-import { useDispatch, useSelector } from "react-redux";
-import { createDocument } from "../store/documentsSlice";
-import { generateFlashcards } from "../store/flashcardsSlice";
-import { generateQuiz } from "../store/quizzesSlice";
+import * as DocumentPicker from "expo-document-picker";
 
-export default function UploadScreen({ route, navigation }) {
-  const { courseId } = route.params;
-  const dispatch = useDispatch();
-  const { loading } = useSelector((state) => state.documents);
+export default function UploadScreen() {
+  const [file, setFile] = useState(null);
 
-  const [title, setTitle] = useState("");
-  const [rawText, setRawText] = useState("");
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+      });
 
-  const handleSubmit = () => {
-    if (!title.trim() || !rawText.trim()) return;
-    dispatch(
-      createDocument({
-        course: courseId,
-        title: title.trim(),
-        raw_text: rawText.trim(),
-        source_type: "paste",
-      })
-    ).then((action) => {
-      if (action.meta.requestStatus === "fulfilled") {
-        navigation.goBack();
+      if (result.canceled) return;
+
+      const selectedFile = result.assets[0];
+      setFile(selectedFile);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to pick document");
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      Alert.alert("Error", "Please select a file first");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+
+      formData.append("file", {
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType || "application/octet-stream",
+      });
+
+      formData.append("title", file.name);
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/documents/",
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert("Success", "File uploaded!");
+        setFile(null);
+      } else {
+        Alert.alert("Error", JSON.stringify(data));
       }
-    });
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Upload failed");
+    }
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
-      <Text style={styles.heading}>Add Document</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Upload Document</Text>
 
-      <Text style={styles.label}>Title</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="e.g. Chapter 5 Notes"
-        value={title}
-        onChangeText={setTitle}
-      />
-
-      <Text style={styles.label}>Paste your content</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Paste lecture notes, textbook excerpts, study guide text..."
-        multiline
-        numberOfLines={10}
-        textAlignVertical="top"
-        value={rawText}
-        onChangeText={setRawText}
-      />
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Save Document</Text>
-        )}
+      <TouchableOpacity style={styles.pickButton} onPress={pickDocument}>
+        <Text style={styles.pickText}>
+          {file ? file.name : "Choose File"}
+        </Text>
       </TouchableOpacity>
-    </ScrollView>
+
+      <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
+        <Text style={styles.uploadText}>Upload</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f7fb" },
-  content: { padding: 24, paddingTop: 60 },
-  heading: {
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: "#f5f7fb",
+  },
+  title: {
     fontSize: 24,
-    fontWeight: "800",
-    color: "#1a1a2e",
-    marginBottom: 24,
+    fontWeight: "bold",
+    marginBottom: 30,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#555",
-    marginBottom: 6,
-  },
-  input: {
+  pickButton: {
     backgroundColor: "#fff",
     borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
+    padding: 20,
     borderWidth: 1,
     borderColor: "#ddd",
-    marginBottom: 16,
-  },
-  textArea: {
-    minHeight: 180,
-  },
-  button: {
-    backgroundColor: "#4361ee",
-    borderRadius: 10,
-    padding: 16,
+    marginBottom: 20,
     alignItems: "center",
-    marginTop: 8,
   },
-  buttonText: {
+  pickText: {
+    color: "#333",
+    fontSize: 16,
+  },
+  uploadButton: {
+    backgroundColor: "#4361ee",
+    padding: 16,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  uploadText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 16,

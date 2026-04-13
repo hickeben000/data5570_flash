@@ -1,30 +1,79 @@
 import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
+import {
+  createDrawerNavigator,
+  DrawerContentScrollView,
+  DrawerItem,
+} from "@react-navigation/drawer";
 import { NavigationContainer } from "@react-navigation/native";
+import { TouchableOpacity, Text } from "react-native";
 
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import HomeScreen from "../screens/HomeScreen";
-import CourseScreen from "../screens/CourseScreen";
 import UploadScreen from "../screens/UploadScreen";
-import FlashcardScreen from "../screens/FlashcardScreen";
-import QuizConfigScreen from "../screens/QuizConfigScreen";
-import QuizScreen from "../screens/QuizScreen";
-import QuizResultsScreen from "../screens/QuizResultsScreen";
 
 const Stack = createStackNavigator();
+const Drawer = createDrawerNavigator();
 
+/* 🔥 Custom Sidebar */
+function CustomDrawerContent(props) {
+  return (
+    <DrawerContentScrollView {...props}>
+      <DrawerItem
+        label="🏠 Home"
+        onPress={() => props.navigation.navigate("Home")}
+      />
+      <DrawerItem
+        label="⬆️ Upload Documents"
+        onPress={() => props.navigation.navigate("Upload Documents")}
+      />
+      <DrawerItem
+        label="⚙️ Settings"
+        onPress={() => props.navigation.navigate("Settings")}
+      />
+      <DrawerItem
+        label="❌ Close Menu"
+        onPress={() => props.navigation.closeDrawer()}
+      />
+    </DrawerContentScrollView>
+  );
+}
+
+/* 🔥 Drawer (Sidebar with hamburger button) */
+function MainApp() {
+  return (
+    <Drawer.Navigator
+      initialRouteName="Home"
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      screenOptions={({ navigation }) => ({
+        headerStyle: { backgroundColor: "#4361ee" },
+        headerTintColor: "#fff",
+        headerTitleStyle: { fontWeight: "700" },
+
+        // 🔥 Hamburger button
+        headerLeft: () => (
+          <TouchableOpacity
+            onPress={() => navigation.toggleDrawer()}
+            style={{ marginLeft: 15 }}
+          >
+            <Text style={{ color: "#fff", fontSize: 22 }}>☰</Text>
+          </TouchableOpacity>
+        ),
+      })}
+    >
+      <Drawer.Screen name="Home" component={HomeScreen} />
+      <Drawer.Screen name="Upload Documents" component={UploadScreen} />
+      <Drawer.Screen name="Settings" component={HomeScreen} />
+    </Drawer.Navigator>
+  );
+}
+
+/* 🔥 Main Navigation */
 export default function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Login"
-        screenOptions={{
-          headerStyle: { backgroundColor: "#4361ee" },
-          headerTintColor: "#fff",
-          headerTitleStyle: { fontWeight: "700" },
-        }}
-      >
+      <Stack.Navigator initialRouteName="Login">
         <Stack.Screen
           name="Login"
           component={LoginScreen}
@@ -35,40 +84,12 @@ export default function AppNavigator() {
           component={RegisterScreen}
           options={{ headerShown: false }}
         />
+
+        {/* 👇 Drawer lives here */}
         <Stack.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{ title: "Flash", headerLeft: () => null }}
-        />
-        <Stack.Screen
-          name="Course"
-          component={CourseScreen}
-          options={({ route }) => ({ title: route.params?.courseName || "Course" })}
-        />
-        <Stack.Screen
-          name="Upload"
-          component={UploadScreen}
-          options={{ title: "Add Document" }}
-        />
-        <Stack.Screen
-          name="Flashcards"
-          component={FlashcardScreen}
-          options={{ title: "Flashcards" }}
-        />
-        <Stack.Screen
-          name="QuizConfig"
-          component={QuizConfigScreen}
-          options={{ title: "Quiz Setup" }}
-        />
-        <Stack.Screen
-          name="Quiz"
-          component={QuizScreen}
-          options={{ title: "Take Quiz" }}
-        />
-        <Stack.Screen
-          name="QuizResults"
-          component={QuizResultsScreen}
-          options={{ title: "Results" }}
+          name="MainApp"
+          component={MainApp}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

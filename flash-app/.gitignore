@@ -40,3 +40,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Python / Django
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+db.sqlite3
