@@ -12,7 +12,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
-GEMINI_API_KEY = env("GEMINI_API_KEY", default="stub")
+GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 
 ALLOWED_HOSTS = ["*"]
 
@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework.authtoken",  # needed for Token-based auth
     "corsheaders",
     "core",
 ]
@@ -81,18 +82,29 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8081",
-    "http://localhost:19006",
-    "http://localhost:19000",
-]
+# ---------------------------------------------------------------------------
+# CORS
+# Currently allowing all origins for local development.
+# TODO (deployment): Replace with explicit CORS_ALLOWED_ORIGINS list.
+#   Example:
+#     CORS_ALLOWED_ORIGINS = [
+#         "https://your-expo-app.com",
+#         "https://your-frontend-domain.com",
+#     ]
+# ---------------------------------------------------------------------------
+CORS_ALLOW_ALL_ORIGINS = True
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        # TokenAuthentication handles the "Authorization: Token <key>" header
+        # that the Expo app sends after login.
+        "rest_framework.authentication.TokenAuthentication",
+        # SessionAuthentication kept for the Django admin browser interface.
         "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        # All endpoints require a valid token by default.
+        # Views that must be public (register, login) override this with AllowAny.
+        "rest_framework.permissions.IsAuthenticated",
     ],
 }
