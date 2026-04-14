@@ -7,9 +7,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { generateQuiz } from "../store/quizzesSlice";
+import * as SecureStore from "expo-secure-store";
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
 
@@ -24,7 +26,32 @@ export default function QuizConfigScreen({ route, navigation }) {
   const [frCount, setFrCount] = useState("1");
   const [extraPrompt, setExtraPrompt] = useState("");
 
-  const handleGenerate = () => {
+  // 🔥 NEW: Get API Key
+  const getApiKey = async () => {
+    try {
+      if (Platform.OS === "web") {
+        return localStorage.getItem("gemini_api_key");
+      } else {
+        return await SecureStore.getItemAsync("gemini_api_key");
+      }
+    } catch (error) {
+      console.error("Error retrieving API key:", error);
+      return null;
+    }
+  };
+
+  const handleGenerate = async () => {
+    // 🔥 STEP 1: Get API key
+    const apiKey = await getApiKey();
+
+    console.log("API KEY FROM SETTINGS:", apiKey);
+
+    if (!apiKey) {
+      alert("No API key found. Please add one in Settings.");
+      return;
+    }
+
+    // 🔥 STEP 2: Continue existing flow
     dispatch(
       generateQuiz({
         documentId,
