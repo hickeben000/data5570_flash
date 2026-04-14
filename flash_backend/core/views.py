@@ -2,10 +2,11 @@ import io
 
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -57,6 +58,31 @@ def extract_text_from_file(file) -> str:
     else:
         # Fall back to reading as UTF-8 text (handles .txt and similar).
         return file.read().decode("utf-8", errors="replace")
+
+
+def get_course_for_user(course_id, user):
+    """404 if missing or not owned by user."""
+    return get_object_or_404(Course, pk=course_id, user=user)
+
+
+def get_document_for_user(document_id, user):
+    """404 if missing or not owned by user (via course)."""
+    return get_object_or_404(Document, pk=document_id, course__user=user)
+
+
+def get_deck_for_user(pk, user):
+    """404 if missing or not owned by user."""
+    return get_object_or_404(FlashcardDeck, pk=pk, document__course__user=user)
+
+
+def get_quiz_for_user(pk, user):
+    """404 if missing or not owned by user."""
+    return get_object_or_404(Quiz, pk=pk, document__course__user=user)
+
+
+def get_flashcard_for_user(pk, user):
+    """404 if missing or not owned by user."""
+    return get_object_or_404(Flashcard, pk=pk, deck__document__course__user=user)
 
 
 # ──────────────────────────── Auth ────────────────────────────
@@ -118,17 +144,22 @@ class DocumentListCreateView(APIView):
     POST /api/courses/<course_id>/documents/  — create a document
 
     Accepts either:
-      - JSON body with a `raw_text` field (source_type="paste")
-      - Multipart form with a `file` field (source_type="upload"); text is extracted server-side
+      - JSON body (application/json) with a `raw_text` field (source_type="paste")
+      - Multipart form (multipart/form-data) with a `file` field (source_type="upload");
+        text is extracted server-side
     """
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request, course_id):
-        documents = Document.objects.filter(course_id=course_id)
+        get_course_for_user(course_id, request.user)
+        documents = Document.objects.filter(
+            course_id=course_id, course__user=request.user
+        )
         serializer = DocumentSerializer(documents, many=True)
         return Response(serializer.data)
 
     def post(self, request, course_id=None):
+        get_course_for_user(course_id, request.user)
         data = request.data.copy()
         if course_id:
             data["course"] = course_id
@@ -153,10 +184,17 @@ class DocumentCreateView(APIView):
     POST /api/documents/ — standalone document creation (course ID in request body).
     Same file-upload handling as DocumentListCreateView.
     """
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def post(self, request):
         data = request.data.copy()
+        course_pk = data.get("course")
+        if course_pk is None:
+            return Response(
+                {"course": ["This field is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        get_course_for_user(course_pk, request.user)
 
         uploaded_file = request.FILES.get("file")
         if uploaded_file:
@@ -177,13 +215,7 @@ class DocumentCreateView(APIView):
 
 class GenerateFlashcardsView(APIView):
     def post(self, request, document_id):
-        try:
-            document = Document.objects.get(pk=document_id)
-        except Document.DoesNotExist:
-            return Response(
-                {"error": "Document not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        document = get_document_for_user(document_id, request.user)
 
         num_cards = request.data.get("num_cards", 10)
         card_data = generate_flashcards(document.raw_text, num_cards=int(num_cards))
@@ -203,26 +235,14 @@ class GenerateFlashcardsView(APIView):
 
 class FlashcardDeckDetailView(APIView):
     def get(self, request, pk):
-        try:
-            deck = FlashcardDeck.objects.get(pk=pk)
-        except FlashcardDeck.DoesNotExist:
-            return Response(
-                {"error": "Flashcard deck not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        deck = get_deck_for_user(pk, request.user)
         serializer = FlashcardDeckSerializer(deck)
         return Response(serializer.data)
 
 
 class FlashcardUpdateView(APIView):
     def put(self, request, pk):
-        try:
-            card = Flashcard.objects.get(pk=pk)
-        except Flashcard.DoesNotExist:
-            return Response(
-                {"error": "Flashcard not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        card = get_flashcard_for_user(pk, request.user)
         serializer = FlashcardSerializer(card, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -235,13 +255,7 @@ class FlashcardUpdateView(APIView):
 
 class GenerateQuizView(APIView):
     def post(self, request, document_id):
-        try:
-            document = Document.objects.get(pk=document_id)
-        except Document.DoesNotExist:
-            return Response(
-                {"error": "Document not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        document = get_document_for_user(document_id, request.user)
 
         difficulty = request.data.get("difficulty", "medium")
         mc_count = int(request.data.get("mc_count", 2))
@@ -260,6 +274,110 @@ class GenerateQuizView(APIView):
             class_name=class_name,
             learning_objectives=learning_objectives,
         )
+
+        def coerce_bool(value):
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, int) and value in (0, 1):
+                return bool(value)
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in ("true", "1", "yes", "y"):
+                    return True
+                if lowered in ("false", "0", "no", "n"):
+                    return False
+            return None
+
+        sanitized_questions = []
+        for q in question_data:
+            if not isinstance(q, dict):
+                return Response(
+                    {"error": "Each question must be an object."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            qtype = q.get("question_type")
+            question_text = (q.get("question_text") or "").strip()
+            raw_choices = q.get("answer_choices") or []
+
+            if qtype not in ("mc", "fitb", "free_response"):
+                return Response(
+                    {
+                        "error": (
+                            "Each question must have question_type "
+                            "'mc', 'fitb', or 'free_response'."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not question_text:
+                return Response(
+                    {"error": "Each question must include non-empty question_text."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not isinstance(raw_choices, list):
+                return Response(
+                    {"error": "answer_choices must be an array."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            choices = []
+            for choice in raw_choices:
+                if not isinstance(choice, dict):
+                    return Response(
+                        {"error": "Each answer choice must be an object."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                choice_text = (choice.get("choice_text") or "").strip()
+                if not choice_text:
+                    return Response(
+                        {"error": "Each answer choice must include non-empty choice_text."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if "is_correct" not in choice:
+                    return Response(
+                        {"error": "Each answer choice must include is_correct."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                is_correct = coerce_bool(choice.get("is_correct"))
+                if is_correct is None:
+                    return Response(
+                        {"error": "is_correct must be a boolean (true/false)."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                choices.append({"choice_text": choice_text, "is_correct": is_correct})
+
+            correct = [c for c in choices if c["is_correct"]]
+            if qtype == "mc" and (len(choices) < 2 or len(correct) != 1):
+                return Response(
+                    {"error": "MC question must have >=2 choices and exactly one correct."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if qtype == "fitb" and (len(choices) != 1 or len(correct) != 1):
+                return Response(
+                    {"error": "FITB question must have exactly one choice and it must be correct."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if qtype == "free_response" and len(choices) != 0:
+                return Response(
+                    {"error": "Free response questions must have 0 choices."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            sanitized_questions.append({
+                "question_type": qtype,
+                "question_text": question_text,
+                "answer_choices": choices,
+            })
+
+        # Use sanitized data (ensures is_correct is a real bool, strings are stripped, etc.)
+        question_data = sanitized_questions
 
         quiz = Quiz.objects.create(
             document=document,
@@ -291,26 +409,14 @@ class GenerateQuizView(APIView):
 
 class QuizDetailView(APIView):
     def get(self, request, pk):
-        try:
-            quiz = Quiz.objects.get(pk=pk)
-        except Quiz.DoesNotExist:
-            return Response(
-                {"error": "Quiz not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        quiz = get_quiz_for_user(pk, request.user)
         serializer = QuizSerializer(quiz)
         return Response(serializer.data)
 
 
 class QuizSubmitView(APIView):
     def put(self, request, pk):
-        try:
-            quiz = Quiz.objects.get(pk=pk)
-        except Quiz.DoesNotExist:
-            return Response(
-                {"error": "Quiz not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        quiz = get_quiz_for_user(pk, request.user)
 
         # Expected format: {"answers": {"<question_id>": "<value>"}}
         # MC:            value = AnswerChoice ID (as string), e.g. "7"

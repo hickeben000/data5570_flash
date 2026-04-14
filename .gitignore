@@ -49,6 +49,7 @@ Thumbs.db
 *.swo
 *~
 .idea/
+.codex
 
 # ----- Expo / Metro (also see flash-app/.gitignore) -----
 # Build outputs if generated at repo root
