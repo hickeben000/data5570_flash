@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import (
+    AnswerChoice,
     Course,
     Document,
     Flashcard,
@@ -57,28 +58,105 @@ class FlashcardDeckSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
+# ---------------------------------------------------------------------------
+# Answer choice serializers
+#
+# AnswerChoiceSerializer   — used while the quiz is in progress.
+#                            is_correct is intentionally excluded so the
+#                            frontend never receives the answer before submission.
+#
+# AnswerChoiceResultSerializer — used in quiz results after submission.
+#                                Includes is_correct so the frontend can
+#                                highlight correct / incorrect choices.
+# ---------------------------------------------------------------------------
+
+class AnswerChoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnswerChoice
+        fields = ["id", "choice_text"]
+
+
+class AnswerChoiceResultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnswerChoice
+        fields = ["id", "choice_text", "is_correct"]
+
+
+# ---------------------------------------------------------------------------
+# Quiz question serializers
+#
+# QuizQuestionSerializer       — during quiz (no answers revealed).
+# QuizQuestionResultSerializer — after submission (shows grading + feedback).
+# ---------------------------------------------------------------------------
+
 class QuizQuestionSerializer(serializers.ModelSerializer):
+    answer_choices = AnswerChoiceSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = QuizQuestion
+        fields = ["id", "question_type", "question_text", "answer_choices"]
+
+
+class QuizQuestionResultSerializer(serializers.ModelSerializer):
+    answer_choices = AnswerChoiceResultSerializer(many=True, read_only=True)
+
     class Meta:
         model = QuizQuestion
         fields = [
             "id",
-            "quiz",
             "question_type",
             "question_text",
-            "choices",
-            "correct_answer",
+            "answer_choices",
             "user_answer",
             "is_correct",
             "explanation",
+            "feedback",
         ]
-        read_only_fields = ["id", "quiz", "question_type", "question_text", "choices",
-                            "correct_answer", "is_correct", "explanation"]
 
+
+# ---------------------------------------------------------------------------
+# Quiz serializers
+#
+# QuizSerializer       — returned immediately after generation and during quiz.
+#                        Questions shown without answers.
+#
+# QuizResultSerializer — returned after quiz submission.
+#                        Full grading data included.
+# ---------------------------------------------------------------------------
 
 class QuizSerializer(serializers.ModelSerializer):
     questions = QuizQuestionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Quiz
-        fields = ["id", "document", "difficulty", "score", "created_at", "completed_at", "questions"]
+        fields = [
+            "id",
+            "document",
+            "difficulty",
+            "class_name",
+            "learning_objectives",
+            "score",
+            "created_at",
+            "completed_at",
+            "questions",
+        ]
         read_only_fields = ["id", "score", "created_at", "completed_at"]
+
+
+class QuizResultSerializer(serializers.ModelSerializer):
+    questions = QuizQuestionResultSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Quiz
+        fields = [
+            "id",
+            "document",
+            "difficulty",
+            "class_name",
+            "learning_objectives",
+            "score",
+            "created_at",
+            "completed_at",
+            "questions",
+        ]
+        read_only_fields = ["id", "created_at"]
