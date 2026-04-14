@@ -75,7 +75,40 @@ Then open in Expo Go, or run `npm run android` / `npm run ios` as needed.
 1. Terminal 1: activate the venv, `python manage.py runserver` (or `runserver 0.0.0.0:8000` for devices).
 2. Terminal 2: `cd flash-app && npm start`.
 
-Register a user via `POST /api/users/register/`, then log in from the app. Stub login returns a dummy token; course CRUD uses the authenticated Django user when session/basic auth is used—see the backend views for current behavior.
+Register a user via `POST /api/users/register/`, then log in from the app. Login returns a **real** DRF auth token; all API routes except register/login require authentication.
+
+## API contract (backend / Expo)
+
+**Authentication**
+
+- Header on every request (except `POST /api/users/register/` and `POST /api/users/login/`):
+
+  `Authorization: Token <token>`
+
+  (`<token>` is the string returned by login.)
+
+**Quiz submit** — `PUT /api/quizzes/<id>/submit/`
+
+- Body shape: `{ "answers": { "<question_id>": <value>, ... } }`
+- Keys are **string** question primary keys (e.g. `"42"`), as JSON object keys.
+- **Multiple choice (`mc`):** value must be the selected **`AnswerChoice` id** (string or number accepted by the client; server parses MC answers as choice id). Do **not** send the visible option text.
+- **Fill-in-the-blank (`fitb`):** value is the user’s plain text answer.
+- **Free response (`free_response`):** value is the user’s plain text answer.
+
+While taking a quiz, choice objects in the API **do not** include `is_correct`. After submit, the result payload includes full grading (including `is_correct` on choices where applicable).
+
+**Migrations**
+
+- If `flash_backend/core/models.py` changes, run from `flash_backend/` (venv active):
+
+  `python manage.py makemigrations && python manage.py migrate`
+
+**Smoke tests (local)**
+
+```bash
+cd flash_backend && source venv/bin/activate
+python manage.py test core
+```
 
 ## Python dependencies
 
