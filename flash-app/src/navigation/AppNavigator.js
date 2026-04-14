@@ -12,6 +12,7 @@ import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import HomeScreen from "../screens/HomeScreen";
 import UploadScreen from "../screens/UploadScreen";
+import SettingsScreen from "../screens/SettingsScreen";
 import DocumentActionScreen from "../screens/DocumentActionScreen";
 import FlashcardScreen from "../screens/FlashcardScreen";
 import QuizConfigScreen from "../screens/QuizConfigScreen";
@@ -19,7 +20,7 @@ import QuizConfigScreen from "../screens/QuizConfigScreen";
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
 
-/* 🔥 Custom Sidebar */
+/* Custom Sidebar */
 function CustomDrawerContent(props) {
   return (
     <DrawerContentScrollView {...props}>
@@ -43,7 +44,7 @@ function CustomDrawerContent(props) {
   );
 }
 
-/* 🔥 Drawer (Sidebar with hamburger button) */
+/* Drawer */
 function MainApp() {
   return (
     <Drawer.Navigator
@@ -65,12 +66,12 @@ function MainApp() {
     >
       <Drawer.Screen name="Home" component={HomeScreen} />
       <Drawer.Screen name="Upload Documents" component={UploadScreen} />
-      <Drawer.Screen name="Settings" component={HomeScreen} />
+      <Drawer.Screen name="Settings" component={SettingsScreen} />
     </Drawer.Navigator>
   );
 }
 
-/* 🔥 Main Navigation */
+/* Main Navigation */
 export default function AppNavigator() {
   return (
     <NavigationContainer>
