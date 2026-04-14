@@ -8,8 +8,9 @@ import {
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 
-export default function UploadScreen() {
+export default function UploadScreen({ navigation }) {
   const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const pickDocument = async () => {
     try {
@@ -21,51 +22,67 @@ export default function UploadScreen() {
 
       const selectedFile = result.assets[0];
       setFile(selectedFile);
+      console.log("Selected file:", selectedFile);
     } catch (error) {
-      console.error(error);
+      console.error("Pick error:", error);
       Alert.alert("Error", "Failed to pick document");
     }
   };
 
   const handleUpload = async () => {
+    console.log("Upload button clicked");
+
     if (!file) {
       Alert.alert("Error", "Please select a file first");
       return;
     }
 
     try {
-      const formData = new FormData();
+      setUploading(true);
 
+      const formData = new FormData();
       formData.append("file", {
         uri: file.uri,
         name: file.name,
         type: file.mimeType || "application/octet-stream",
       });
-
       formData.append("title", file.name);
 
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/documents/",
-        {
-          method: "POST",
-          body: formData,
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      console.log("Starting upload...");
 
-      const data = await response.json();
+      const response = await fetch("http://127.0.0.1:8000/api/documents/", {
+        method: "POST",
+        body: formData,
+      });
+
+      const rawText = await response.text();
+      console.log("Upload status:", response.status);
+      console.log("Upload response text:", rawText);
+
+      let data = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = { raw: rawText };
+      }
 
       if (response.ok) {
-        Alert.alert("Success", "File uploaded!");
+        Alert.alert("Success", "Upload worked");
+
         setFile(null);
+
+        navigation.navigate("DocumentAction", {
+          documentId: data.id,
+          documentTitle: data.title || file.name,
+        });
       } else {
-        Alert.alert("Error", JSON.stringify(data));
+        Alert.alert("Upload Failed", rawText || "Unknown backend error");
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Upload failed");
+      console.error("Upload error:", error);
+      Alert.alert("Error", "Could not connect to server");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -79,8 +96,14 @@ export default function UploadScreen() {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
-        <Text style={styles.uploadText}>Upload</Text>
+      <TouchableOpacity
+        style={[styles.uploadButton, uploading && styles.disabledButton]}
+        onPress={handleUpload}
+        disabled={uploading}
+      >
+        <Text style={styles.uploadText}>
+          {uploading ? "Uploading..." : "Upload"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -115,6 +138,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 10,
     alignItems: "center",
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   uploadText: {
     color: "#fff",

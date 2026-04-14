@@ -12,6 +12,7 @@ import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import HomeScreen from "../screens/HomeScreen";
 import UploadScreen from "../screens/UploadScreen";
+import DocumentActionScreen from "../screens/DocumentActionScreen"; // ✅ NEW
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -90,6 +91,13 @@ export default function AppNavigator() {
           name="MainApp"
           component={MainApp}
           options={{ headerShown: false }}
+        />
+
+        {/* ✅ NEW SCREEN (outside drawer) */}
+        <Stack.Screen
+          name="DocumentAction"
+          component={DocumentActionScreen}
+          options={{ title: "Choose Action" }}
         />
       </Stack.Navigator>
     </NavigationContainer>
