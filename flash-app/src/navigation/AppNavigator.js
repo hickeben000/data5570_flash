@@ -12,7 +12,9 @@ import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import HomeScreen from "../screens/HomeScreen";
 import UploadScreen from "../screens/UploadScreen";
-import DocumentActionScreen from "../screens/DocumentActionScreen"; // ✅ NEW
+import DocumentActionScreen from "../screens/DocumentActionScreen";
+import FlashcardScreen from "../screens/FlashcardScreen";
+import QuizConfigScreen from "../screens/QuizConfigScreen";
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -51,8 +53,6 @@ function MainApp() {
         headerStyle: { backgroundColor: "#4361ee" },
         headerTintColor: "#fff",
         headerTitleStyle: { fontWeight: "700" },
-
-        // 🔥 Hamburger button
         headerLeft: () => (
           <TouchableOpacity
             onPress={() => navigation.toggleDrawer()}
@@ -85,19 +85,25 @@ export default function AppNavigator() {
           component={RegisterScreen}
           options={{ headerShown: false }}
         />
-
-        {/* 👇 Drawer lives here */}
         <Stack.Screen
           name="MainApp"
           component={MainApp}
           options={{ headerShown: false }}
         />
-
-        {/* ✅ NEW SCREEN (outside drawer) */}
         <Stack.Screen
           name="DocumentAction"
           component={DocumentActionScreen}
           options={{ title: "Choose Action" }}
+        />
+        <Stack.Screen
+          name="Flashcards"
+          component={FlashcardScreen}
+          options={{ title: "Flashcards" }}
+        />
+        <Stack.Screen
+          name="QuizConfig"
+          component={QuizConfigScreen}
+          options={{ title: "Quiz Setup" }}
         />
       </Stack.Navigator>
     </NavigationContainer>

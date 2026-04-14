@@ -1,86 +1,55 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 
 export default function UploadScreen({ navigation }) {
   const [file, setFile] = useState(null);
+  const [statusText, setStatusText] = useState("No file selected");
   const [uploading, setUploading] = useState(false);
 
-  const pickDocument = async () => {
+  const handlePickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: "*/*",
       });
 
-      if (result.canceled) return;
+      console.log("PICK RESULT:", result);
 
-      const selectedFile = result.assets[0];
+      if (result.canceled) {
+        setStatusText("Selection canceled");
+        return;
+      }
+
+      const selectedFile = result.assets?.[0];
       setFile(selectedFile);
-      console.log("Selected file:", selectedFile);
+      setStatusText(selectedFile?.name || "Unknown file");
     } catch (error) {
-      console.error("Pick error:", error);
-      Alert.alert("Error", "Failed to pick document");
+      console.error("DOCUMENT PICKER ERROR:", error);
+      setStatusText("Picker failed");
     }
   };
 
   const handleUpload = async () => {
-    console.log("Upload button clicked");
-
     if (!file) {
-      Alert.alert("Error", "Please select a file first");
+      setStatusText("Please choose a file first");
       return;
     }
 
     try {
       setUploading(true);
+      setStatusText("Uploading...");
 
-      const formData = new FormData();
-      formData.append("file", {
-        uri: file.uri,
-        name: file.name,
-        type: file.mimeType || "application/octet-stream",
-      });
-      formData.append("title", file.name);
-
-      console.log("Starting upload...");
-
-      const response = await fetch("http://127.0.0.1:8000/api/documents/", {
-        method: "POST",
-        body: formData,
-      });
-
-      const rawText = await response.text();
-      console.log("Upload status:", response.status);
-      console.log("Upload response text:", rawText);
-
-      let data = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = { raw: rawText };
-      }
-
-      if (response.ok) {
-        Alert.alert("Success", "Upload worked");
-
-        setFile(null);
-
+      // TEMPORARY SUCCESS TEST
+      // We are only proving navigation works after upload logic.
+      setTimeout(() => {
         navigation.navigate("DocumentAction", {
-          documentId: data.id,
-          documentTitle: data.title || file.name,
+          documentId: 1,
+          documentTitle: file.name,
         });
-      } else {
-        Alert.alert("Upload Failed", rawText || "Unknown backend error");
-      }
+      }, 500);
     } catch (error) {
-      console.error("Upload error:", error);
-      Alert.alert("Error", "Could not connect to server");
+      console.error("UPLOAD ERROR:", error);
+      setStatusText("Upload failed");
     } finally {
       setUploading(false);
     }
@@ -89,22 +58,21 @@ export default function UploadScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Upload Document</Text>
+      <Text style={styles.subtitle}>{statusText}</Text>
 
-      <TouchableOpacity style={styles.pickButton} onPress={pickDocument}>
-        <Text style={styles.pickText}>
-          {file ? file.name : "Choose File"}
-        </Text>
-      </TouchableOpacity>
+      <Pressable style={styles.button} onPress={handlePickFile}>
+        <Text style={styles.buttonText}>Choose File</Text>
+      </Pressable>
 
-      <TouchableOpacity
-        style={[styles.uploadButton, uploading && styles.disabledButton]}
+      <Pressable
+        style={[styles.button, uploading && styles.disabledButton]}
         onPress={handleUpload}
         disabled={uploading}
       >
-        <Text style={styles.uploadText}>
+        <Text style={styles.buttonText}>
           {uploading ? "Uploading..." : "Upload"}
         </Text>
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 }
@@ -114,35 +82,33 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: "#f5f7fb",
+    justifyContent: "center",
+    alignItems: "center",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 30,
+    marginBottom: 12,
   },
-  pickButton: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    marginBottom: 20,
-    alignItems: "center",
-  },
-  pickText: {
-    color: "#333",
+  subtitle: {
     fontSize: 16,
+    marginBottom: 20,
+    color: "#555",
+    textAlign: "center",
   },
-  uploadButton: {
+  button: {
     backgroundColor: "#4361ee",
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: 10,
+    marginBottom: 12,
+    minWidth: 180,
     alignItems: "center",
   },
   disabledButton: {
     opacity: 0.7,
   },
-  uploadText: {
+  buttonText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 16,

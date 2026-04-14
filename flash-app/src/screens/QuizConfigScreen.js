@@ -22,6 +22,7 @@ export default function QuizConfigScreen({ route, navigation }) {
   const [mcCount, setMcCount] = useState("2");
   const [fitbCount, setFitbCount] = useState("1");
   const [frCount, setFrCount] = useState("1");
+  const [extraPrompt, setExtraPrompt] = useState("");
 
   const handleGenerate = () => {
     dispatch(
@@ -31,6 +32,7 @@ export default function QuizConfigScreen({ route, navigation }) {
         mc_count: parseInt(mcCount, 10) || 0,
         fitb_count: parseInt(fitbCount, 10) || 0,
         fr_count: parseInt(frCount, 10) || 0,
+        extra_prompt: extraPrompt,
       })
     ).then((action) => {
       if (action.meta.requestStatus === "fulfilled") {
@@ -90,6 +92,15 @@ export default function QuizConfigScreen({ route, navigation }) {
         onChangeText={setFrCount}
       />
 
+      <Text style={styles.label}>Extra Instructions</Text>
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        multiline
+        placeholder="Example: Focus on key vocabulary, skip chapter 1, and ask more conceptual questions."
+        value={extraPrompt}
+        onChangeText={setExtraPrompt}
+      />
+
       <TouchableOpacity
         style={styles.button}
         onPress={handleGenerate}
@@ -121,7 +132,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 12,
   },
-  row: { flexDirection: "row", gap: 10, marginBottom: 8 },
+  row: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 8,
+    flexWrap: "wrap",
+  },
   chip: {
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -140,12 +156,17 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     marginBottom: 8,
   },
+  textArea: {
+    minHeight: 110,
+    textAlignVertical: "top",
+  },
   button: {
     backgroundColor: "#4361ee",
     borderRadius: 10,
     padding: 16,
     alignItems: "center",
     marginTop: 20,
+    marginBottom: 20,
   },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });
