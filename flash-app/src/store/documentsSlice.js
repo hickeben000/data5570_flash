@@ -1,35 +1,63 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import api from "../api/api";
 
+function buildUploadFormData({ course, title, file }) {
+  const formData = new FormData();
+  formData.append("course", String(course));
+  if (title?.trim()) {
+    formData.append("title", title.trim());
+  }
+
+  if (file?.file) {
+    formData.append("file", file.file, file.name || "upload");
+    return formData;
+  }
+
+  formData.append("file", {
+    uri: file.uri,
+    name: file.name || "upload",
+    type: file.mimeType || file.type || "application/octet-stream",
+  });
+  return formData;
+}
+
 export const fetchDocuments = createAsyncThunk(
   "documents/fetchAll",
   async (courseId, { rejectWithValue }) => {
     try {
       const response = await api.get(`/courses/${courseId}/documents/`);
-      return response.data;
+      return {
+        courseId,
+        documents: response.data,
+      };
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data || "Failed to fetch documents"
-      );
+      return rejectWithValue(err.response?.data || "Failed to fetch documents");
     }
   }
 );
 
 export const createDocument = createAsyncThunk(
   "documents/create",
-  async ({ course, title, raw_text, source_type = "paste" }, { rejectWithValue }) => {
+  async ({ course, title, rawText, file }, { rejectWithValue }) => {
     try {
-      const response = await api.post("/documents/", {
-        course,
-        title,
-        raw_text,
-        source_type,
-      });
+      let response;
+      if (file) {
+        response = await api.post("/documents/", buildUploadFormData({ course, title, file }), {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+      } else {
+        response = await api.post("/documents/", {
+          course,
+          title,
+          raw_text: rawText,
+          source_type: "paste",
+        });
+      }
       return response.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data || "Failed to create document"
-      );
+      return rejectWithValue(err.response?.data || "Failed to create document");
     }
   }
 );
@@ -38,10 +66,15 @@ const documentsSlice = createSlice({
   name: "documents",
   initialState: {
     documents: [],
+    currentCourseId: null,
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    clearDocumentsError(state) {
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchDocuments.pending, (state) => {
@@ -50,7 +83,8 @@ const documentsSlice = createSlice({
       })
       .addCase(fetchDocuments.fulfilled, (state, action) => {
         state.loading = false;
-        state.documents = action.payload;
+        state.currentCourseId = action.payload.courseId;
+        state.documents = action.payload.documents;
       })
       .addCase(fetchDocuments.rejected, (state, action) => {
         state.loading = false;
@@ -62,7 +96,7 @@ const documentsSlice = createSlice({
       })
       .addCase(createDocument.fulfilled, (state, action) => {
         state.loading = false;
-        state.documents.push(action.payload);
+        state.documents.unshift(action.payload);
       })
       .addCase(createDocument.rejected, (state, action) => {
         state.loading = false;
@@ -71,4 +105,5 @@ const documentsSlice = createSlice({
   },
 });
 
+export const { clearDocumentsError } = documentsSlice.actions;
 export default documentsSlice.reducer;

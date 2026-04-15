@@ -13,8 +13,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
-
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+REQUIRE_HTTPS_FOR_AI = env.bool("REQUIRE_HTTPS_FOR_AI", default=not DEBUG)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -82,17 +83,21 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ---------------------------------------------------------------------------
-# CORS
-# Currently allowing all origins for local development.
-# TODO (deployment): Replace with explicit CORS_ALLOWED_ORIGINS list.
-#   Example:
-#     CORS_ALLOWED_ORIGINS = [
-#         "https://your-expo-app.com",
-#         "https://your-frontend-domain.com",
-#     ]
-# ---------------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=False)
+
+_default_cors_origins = [
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://localhost:19006",
+    "http://127.0.0.1:19006",
+]
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=_default_cors_origins,
+)
+CORS_ALLOW_ALL_ORIGINS = False
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

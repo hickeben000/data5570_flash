@@ -1,7 +1,7 @@
 import io
 
+from django.conf import settings
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -11,7 +11,14 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .ai_utils import generate_flashcards, generate_quiz, grade_free_response_batch
+from .ai_utils import (
+    AIConfigurationError,
+    AIProviderError,
+    AIResponseError,
+    generate_flashcards,
+    generate_quiz,
+    grade_free_response_batch,
+)
 from .models import (
     AnswerChoice,
     Course,
@@ -85,6 +92,45 @@ def get_flashcard_for_user(pk, user):
     return get_object_or_404(Flashcard, pk=pk, deck__document__course__user=user)
 
 
+def parse_int_field(value, *, default, field_name, minimum=0):
+    if value in (None, ""):
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be an integer.")
+    if parsed < minimum:
+        raise ValueError(f"{field_name} must be at least {minimum}.")
+    return parsed
+
+
+def get_request_api_key(request):
+    return (request.headers.get("X-Gemini-Api-Key") or "").strip()
+
+
+def request_uses_https(request):
+    if request.is_secure():
+        return True
+    return request.headers.get("X-Forwarded-Proto", "").lower() == "https"
+
+
+def validate_ai_request_security(request):
+    if (
+        get_request_api_key(request)
+        and getattr(settings, "REQUIRE_HTTPS_FOR_AI", False)
+        and not request_uses_https(request)
+    ):
+        raise AIConfigurationError(
+            "Gemini requests must use HTTPS in deployed environments."
+        )
+
+
+def ai_error_response(exc):
+    if isinstance(exc, AIProviderError):
+        return Response({"error": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+    return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 # ──────────────────────────── Auth ────────────────────────────
 
 
@@ -117,6 +163,18 @@ class LoginView(APIView):
         return Response(
             {"error": "Invalid credentials"},
             status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+
+class HealthCheckView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(
+            {
+                "status": "ok",
+                "debug": settings.DEBUG,
+            }
         )
 
 
@@ -216,9 +274,25 @@ class DocumentCreateView(APIView):
 class GenerateFlashcardsView(APIView):
     def post(self, request, document_id):
         document = get_document_for_user(document_id, request.user)
-
-        num_cards = request.data.get("num_cards", 10)
-        card_data = generate_flashcards(document.raw_text, num_cards=int(num_cards))
+        try:
+            validate_ai_request_security(request)
+            num_cards = parse_int_field(
+                request.data.get("num_cards"),
+                default=10,
+                field_name="num_cards",
+                minimum=1,
+            )
+            extra_prompt = request.data.get("extra_prompt", "")
+            card_data = generate_flashcards(
+                document.raw_text,
+                num_cards=num_cards,
+                extra_prompt=extra_prompt,
+                api_key=get_request_api_key(request),
+            )
+        except (AIConfigurationError, AIProviderError, AIResponseError) as exc:
+            return ai_error_response(exc)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         deck = FlashcardDeck.objects.create(
             document=document,
@@ -256,128 +330,49 @@ class FlashcardUpdateView(APIView):
 class GenerateQuizView(APIView):
     def post(self, request, document_id):
         document = get_document_for_user(document_id, request.user)
+        try:
+            validate_ai_request_security(request)
+            difficulty = request.data.get("difficulty", "medium")
+            mc_count = parse_int_field(
+                request.data.get("mc_count"),
+                default=2,
+                field_name="mc_count",
+                minimum=0,
+            )
+            fitb_count = parse_int_field(
+                request.data.get("fitb_count"),
+                default=1,
+                field_name="fitb_count",
+                minimum=0,
+            )
+            fr_count = parse_int_field(
+                request.data.get("fr_count"),
+                default=1,
+                field_name="fr_count",
+                minimum=0,
+            )
+            if mc_count + fitb_count + fr_count <= 0:
+                raise ValueError("At least one quiz question is required.")
 
-        difficulty = request.data.get("difficulty", "medium")
-        mc_count = int(request.data.get("mc_count", 2))
-        fitb_count = int(request.data.get("fitb_count", 1))
-        fr_count = int(request.data.get("fr_count", 1))
-        # Context fields — passed through to Gemini so questions are targeted.
-        class_name = request.data.get("class_name", "")
-        learning_objectives = request.data.get("learning_objectives", "")
+            class_name = request.data.get("class_name", "")
+            learning_objectives = request.data.get("learning_objectives", "")
+            extra_prompt = request.data.get("extra_prompt", "")
 
-        question_data = generate_quiz(
-            document.raw_text,
-            difficulty,
-            mc_count,
-            fitb_count,
-            fr_count,
-            class_name=class_name,
-            learning_objectives=learning_objectives,
-        )
-
-        def coerce_bool(value):
-            if isinstance(value, bool):
-                return value
-            if isinstance(value, int) and value in (0, 1):
-                return bool(value)
-            if isinstance(value, str):
-                lowered = value.strip().lower()
-                if lowered in ("true", "1", "yes", "y"):
-                    return True
-                if lowered in ("false", "0", "no", "n"):
-                    return False
-            return None
-
-        sanitized_questions = []
-        for q in question_data:
-            if not isinstance(q, dict):
-                return Response(
-                    {"error": "Each question must be an object."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            qtype = q.get("question_type")
-            question_text = (q.get("question_text") or "").strip()
-            raw_choices = q.get("answer_choices") or []
-
-            if qtype not in ("mc", "fitb", "free_response"):
-                return Response(
-                    {
-                        "error": (
-                            "Each question must have question_type "
-                            "'mc', 'fitb', or 'free_response'."
-                        )
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if not question_text:
-                return Response(
-                    {"error": "Each question must include non-empty question_text."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if not isinstance(raw_choices, list):
-                return Response(
-                    {"error": "answer_choices must be an array."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            choices = []
-            for choice in raw_choices:
-                if not isinstance(choice, dict):
-                    return Response(
-                        {"error": "Each answer choice must be an object."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                choice_text = (choice.get("choice_text") or "").strip()
-                if not choice_text:
-                    return Response(
-                        {"error": "Each answer choice must include non-empty choice_text."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                if "is_correct" not in choice:
-                    return Response(
-                        {"error": "Each answer choice must include is_correct."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                is_correct = coerce_bool(choice.get("is_correct"))
-                if is_correct is None:
-                    return Response(
-                        {"error": "is_correct must be a boolean (true/false)."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                choices.append({"choice_text": choice_text, "is_correct": is_correct})
-
-            correct = [c for c in choices if c["is_correct"]]
-            if qtype == "mc" and (len(choices) < 2 or len(correct) != 1):
-                return Response(
-                    {"error": "MC question must have >=2 choices and exactly one correct."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if qtype == "fitb" and (len(choices) != 1 or len(correct) != 1):
-                return Response(
-                    {"error": "FITB question must have exactly one choice and it must be correct."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if qtype == "free_response" and len(choices) != 0:
-                return Response(
-                    {"error": "Free response questions must have 0 choices."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            sanitized_questions.append({
-                "question_type": qtype,
-                "question_text": question_text,
-                "answer_choices": choices,
-            })
-
-        # Use sanitized data (ensures is_correct is a real bool, strings are stripped, etc.)
-        question_data = sanitized_questions
+            question_data = generate_quiz(
+                document.raw_text,
+                difficulty,
+                mc_count,
+                fitb_count,
+                fr_count,
+                class_name=class_name,
+                learning_objectives=learning_objectives,
+                extra_prompt=extra_prompt,
+                api_key=get_request_api_key(request),
+            )
+        except (AIConfigurationError, AIProviderError, AIResponseError) as exc:
+            return ai_error_response(exc)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         quiz = Quiz.objects.create(
             document=document,
@@ -410,7 +405,8 @@ class GenerateQuizView(APIView):
 class QuizDetailView(APIView):
     def get(self, request, pk):
         quiz = get_quiz_for_user(pk, request.user)
-        serializer = QuizSerializer(quiz)
+        serializer_class = QuizResultSerializer if quiz.completed_at else QuizSerializer
+        serializer = serializer_class(quiz)
         return Response(serializer.data)
 
 
@@ -428,6 +424,11 @@ class QuizSubmitView(APIView):
         auto_correct = 0
 
         free_response_questions = []
+        try:
+            if questions.filter(question_type="free_response").exists():
+                validate_ai_request_security(request)
+        except AIConfigurationError as exc:
+            return ai_error_response(exc)
 
         for question in questions:
             user_answer = answers.get(str(question.id), "")
@@ -464,20 +465,17 @@ class QuizSubmitView(APIView):
                 question.save()
                 free_response_questions.append(question)
 
-        # ── Gemini grading for free response ──────────────────────────────
-        # TODO (Gemini): grade_free_response_batch is currently a stub.
-        #   When implemented it will call Gemini once with all FR questions
-        #   and return per-question {is_correct, feedback, explanation}.
-        #   The feedback will include what the student struggled with so it
-        #   can be fed back as context when re-generating a quiz from the
-        #   same document (see generate_quiz in ai_utils.py).
         if free_response_questions:
-            results = grade_free_response_batch(
-                free_response_questions,
-                document_text=quiz.document.raw_text,
-                class_name=quiz.class_name,
-                learning_objectives=quiz.learning_objectives,
-            )
+            try:
+                results = grade_free_response_batch(
+                    free_response_questions,
+                    document_text=quiz.document.raw_text,
+                    class_name=quiz.class_name,
+                    learning_objectives=quiz.learning_objectives,
+                    api_key=get_request_api_key(request),
+                )
+            except (AIConfigurationError, AIProviderError, AIResponseError) as exc:
+                return ai_error_response(exc)
             for question, result in zip(free_response_questions, results):
                 question.is_correct = result.get("is_correct", False)
                 question.feedback = result.get("feedback", "")

@@ -1,56 +1,346 @@
 """
 AI utility functions powered by Google Gemini.
 
-All functions currently return stub data so the rest of the app can be
-developed and tested without a live API key.
+This module expects a Gemini API key either from the request header
+(`X-Gemini-Api-Key`) or, optionally, from `settings.GEMINI_API_KEY`.
 
-TODO (Gemini): When ready to go live:
-  1. pip install google-generativeai (already in requirements.txt)
-  2. Set GEMINI_API_KEY in flash_backend/.env
-  3. Uncomment the genai lines in each function and remove the stub returns.
-  4. Run the app and verify the response shapes match what the views expect.
-
-Expected env var: GEMINI_API_KEY (loaded in settings.py as settings.GEMINI_API_KEY)
+Each public function returns validated Python data structures that match the
+backend serializers and view expectations.
 """
 
-# import google.generativeai as genai
-# from django.conf import settings
-# genai.configure(api_key=settings.GEMINI_API_KEY)
+from __future__ import annotations
+
+import json
+import re
+from typing import Any
+
+from django.conf import settings
 
 
-# ──────────────────────────── Flashcards ──────────────────────
+DEFAULT_MODEL = "gemini-1.5-flash"
 
 
-def generate_flashcards(document_text: str, num_cards: int = 10) -> list[dict]:
-    """
-    Generate flashcards from document text.
+class AIError(Exception):
+    """Base class for AI-related failures."""
 
-    Returns a list of dicts:
-        [{"front": "<question>", "back": "<answer>"}, ...]
 
-    TODO (Gemini): Replace stub with something like:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        prompt = (
-            f"Generate exactly {num_cards} flashcards from the text below. "
-            "Return a JSON array where each item has 'front' (a question) "
-            "and 'back' (the answer). Return only the JSON array, no extra text.\n\n"
-            f"{document_text}"
+class AIConfigurationError(AIError):
+    """Raised when Gemini is unavailable due to missing configuration."""
+
+
+class AIResponseError(AIError):
+    """Raised when Gemini returns malformed or unexpected data."""
+
+
+class AIProviderError(AIError):
+    """Raised when the Gemini SDK fails to complete a request."""
+
+
+def _resolve_api_key(api_key: str | None) -> str:
+    resolved = (api_key or settings.GEMINI_API_KEY or "").strip()
+    if not resolved:
+        raise AIConfigurationError(
+            "A Gemini API key is required. Add one in the app settings and retry."
         )
+    return resolved
+
+
+def _get_model(api_key: str):
+    try:
+        import google.generativeai as genai
+    except ImportError as exc:
+        raise AIConfigurationError(
+            "The Google Generative AI SDK is not installed on the backend."
+        ) from exc
+
+    genai.configure(api_key=api_key)
+    return genai.GenerativeModel(DEFAULT_MODEL)
+
+
+def _extract_json_block(raw_text: str) -> str:
+    text = (raw_text or "").strip()
+    if not text:
+        raise AIResponseError("Gemini returned an empty response.")
+
+    fenced_match = re.search(r"```(?:json)?\s*(.*?)```", text, flags=re.DOTALL)
+    if fenced_match:
+        return fenced_match.group(1).strip()
+
+    list_start = text.find("[")
+    list_end = text.rfind("]")
+    if list_start != -1 and list_end != -1 and list_end > list_start:
+        return text[list_start : list_end + 1].strip()
+
+    obj_start = text.find("{")
+    obj_end = text.rfind("}")
+    if obj_start != -1 and obj_end != -1 and obj_end > obj_start:
+        return text[obj_start : obj_end + 1].strip()
+
+    raise AIResponseError("Gemini did not return JSON.")
+
+
+def _generate_json(prompt: str, api_key: str | None) -> Any:
+    key = _resolve_api_key(api_key)
+    model = _get_model(key)
+
+    try:
         response = model.generate_content(prompt)
-        return json.loads(response.text)
-    """
-    # ── STUB ────────────────────────────────────────────────────────────────
-    return [
-        {
-            "front": f"Sample question {i} from the document?",
-            "back": f"Sample answer {i} — will be AI-generated from your content.",
-        }
-        for i in range(1, num_cards + 1)
+    except Exception as exc:  # pragma: no cover - SDK/network failures vary.
+        raise AIProviderError(f"Gemini request failed: {exc}") from exc
+
+    json_text = _extract_json_block(getattr(response, "text", ""))
+    try:
+        return json.loads(json_text)
+    except json.JSONDecodeError as exc:
+        raise AIResponseError("Gemini returned invalid JSON.") from exc
+
+
+def _validate_non_empty_string(value: Any, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise AIResponseError(f"{field_name} must be a string.")
+    cleaned = value.strip()
+    if not cleaned:
+        raise AIResponseError(f"{field_name} must not be empty.")
+    return cleaned
+
+
+def _coerce_bool(value: Any, field_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    raise AIResponseError(f"{field_name} must be a boolean.")
+
+
+def _validate_flashcards(payload: Any, expected_count: int) -> list[dict[str, str]]:
+    if not isinstance(payload, list):
+        raise AIResponseError("Gemini must return a JSON array of flashcards.")
+
+    cards = []
+    for card in payload:
+        if not isinstance(card, dict):
+            raise AIResponseError("Each flashcard must be a JSON object.")
+        cards.append(
+            {
+                "front": _validate_non_empty_string(card.get("front"), "front"),
+                "back": _validate_non_empty_string(card.get("back"), "back"),
+            }
+        )
+
+    if len(cards) != expected_count:
+        raise AIResponseError(
+            f"Gemini returned {len(cards)} flashcards, expected {expected_count}."
+        )
+
+    return cards
+
+
+def _validate_quiz_questions(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, list):
+        raise AIResponseError("Gemini must return a JSON array of quiz questions.")
+
+    validated_questions: list[dict[str, Any]] = []
+    for question in payload:
+        if not isinstance(question, dict):
+            raise AIResponseError("Each quiz question must be a JSON object.")
+
+        question_type = _validate_non_empty_string(
+            question.get("question_type"), "question_type"
+        )
+        if question_type not in {"mc", "fitb", "free_response"}:
+            raise AIResponseError(
+                "question_type must be 'mc', 'fitb', or 'free_response'."
+            )
+
+        question_text = _validate_non_empty_string(
+            question.get("question_text"), "question_text"
+        )
+        raw_choices = question.get("answer_choices", [])
+        if not isinstance(raw_choices, list):
+            raise AIResponseError("answer_choices must be an array.")
+
+        answer_choices = []
+        for choice in raw_choices:
+            if not isinstance(choice, dict):
+                raise AIResponseError("Each answer choice must be a JSON object.")
+            answer_choices.append(
+                {
+                    "choice_text": _validate_non_empty_string(
+                        choice.get("choice_text"), "choice_text"
+                    ),
+                    "is_correct": _coerce_bool(choice.get("is_correct"), "is_correct"),
+                }
+            )
+
+        correct_count = sum(1 for choice in answer_choices if choice["is_correct"])
+        if question_type == "mc":
+            if len(answer_choices) < 2 or correct_count != 1:
+                raise AIResponseError(
+                    "Multiple choice questions must have at least 2 options and "
+                    "exactly 1 correct answer."
+                )
+        elif question_type == "fitb":
+            if len(answer_choices) != 1 or correct_count != 1:
+                raise AIResponseError(
+                    "Fill-in-the-blank questions must have exactly 1 correct answer."
+                )
+        elif answer_choices:
+            raise AIResponseError("Free-response questions must not include choices.")
+
+        validated_questions.append(
+            {
+                "question_type": question_type,
+                "question_text": question_text,
+                "answer_choices": answer_choices,
+            }
+        )
+
+    return validated_questions
+
+
+def _validate_free_response_results(payload: Any, expected_count: int) -> list[dict[str, Any]]:
+    if not isinstance(payload, list):
+        raise AIResponseError(
+            "Gemini must return a JSON array when grading free-response questions."
+        )
+    if len(payload) != expected_count:
+        raise AIResponseError(
+            f"Gemini returned {len(payload)} grading results, expected {expected_count}."
+        )
+
+    validated_results = []
+    for result in payload:
+        if not isinstance(result, dict):
+            raise AIResponseError("Each grading result must be a JSON object.")
+        validated_results.append(
+            {
+                "is_correct": _coerce_bool(result.get("is_correct"), "is_correct"),
+                "feedback": _validate_non_empty_string(result.get("feedback"), "feedback"),
+                "explanation": _validate_non_empty_string(
+                    result.get("explanation"), "explanation"
+                ),
+            }
+        )
+    return validated_results
+
+
+def _build_flashcard_prompt(
+    document_text: str, num_cards: int, extra_prompt: str = ""
+) -> str:
+    prompt_bits = [
+        "You create concise, accurate study flashcards from course material.",
+        f"Generate exactly {num_cards} flashcards from the source text below.",
+        "Return only JSON.",
+        (
+            "Use this schema: "
+            '[{"front":"question or term","back":"answer or explanation"}]'
+        ),
+        "Keep each card specific, study-friendly, and grounded in the source.",
     ]
-    # ── END STUB ─────────────────────────────────────────────────────────────
+    if extra_prompt.strip():
+        prompt_bits.append(f"Extra instructions: {extra_prompt.strip()}")
+
+    prompt_bits.extend(
+        [
+            "Source text:",
+            document_text,
+        ]
+    )
+    return "\n\n".join(prompt_bits)
 
 
-# ──────────────────────────── Quiz generation ─────────────────
+def _build_quiz_prompt(
+    document_text: str,
+    difficulty: str,
+    mc_count: int,
+    fitb_count: int,
+    fr_count: int,
+    class_name: str = "",
+    learning_objectives: str = "",
+    extra_prompt: str = "",
+) -> str:
+    prompt_bits = [
+        "You create quizzes from course material.",
+        "Return only JSON.",
+        (
+            "Schema: "
+            '[{"question_type":"mc|fitb|free_response","question_text":"...","answer_choices":[{"choice_text":"...","is_correct":true}]}]'
+        ),
+        f"Difficulty: {difficulty}.",
+        (
+            f"Generate exactly {mc_count} multiple-choice questions, "
+            f"{fitb_count} fill-in-the-blank questions, and {fr_count} "
+            "free-response questions."
+        ),
+        "Multiple choice questions must have 4 answer choices and exactly 1 correct answer.",
+        "Fill-in-the-blank questions must have exactly 1 correct answer choice.",
+        "Free-response questions must have an empty answer_choices array.",
+    ]
+
+    if class_name.strip():
+        prompt_bits.append(f"Class name: {class_name.strip()}")
+    if learning_objectives.strip():
+        prompt_bits.append(
+            f"Learning objectives: {learning_objectives.strip()}"
+        )
+    if extra_prompt.strip():
+        prompt_bits.append(f"Extra instructions: {extra_prompt.strip()}")
+
+    prompt_bits.extend(
+        [
+            "Source text:",
+            document_text,
+        ]
+    )
+    return "\n\n".join(prompt_bits)
+
+
+def _build_free_response_prompt(
+    questions,
+    document_text: str = "",
+    class_name: str = "",
+    learning_objectives: str = "",
+) -> str:
+    question_block = []
+    for index, question in enumerate(questions, start=1):
+        question_block.append(
+            "\n".join(
+                [
+                    f"Question {index}: {question.question_text}",
+                    f"Student answer {index}: {question.user_answer or '(blank)'}",
+                ]
+            )
+        )
+
+    prompt_bits = [
+        "You are grading free-response quiz answers against the provided study material.",
+        "Return only JSON.",
+        (
+            "Schema: "
+            '[{"is_correct":true,"feedback":"personalized feedback","explanation":"ideal answer"}]'
+        ),
+        "Be fair but concise. Mark is_correct true only when the answer demonstrates understanding.",
+    ]
+    if class_name.strip():
+        prompt_bits.append(f"Class name: {class_name.strip()}")
+    if learning_objectives.strip():
+        prompt_bits.append(
+            f"Learning objectives: {learning_objectives.strip()}"
+        )
+    if document_text.strip():
+        prompt_bits.extend(["Source text:", document_text])
+
+    prompt_bits.extend(["Questions and student answers:", "\n\n".join(question_block)])
+    return "\n\n".join(prompt_bits)
+
+
+def generate_flashcards(
+    document_text: str,
+    num_cards: int = 10,
+    extra_prompt: str = "",
+    api_key: str | None = None,
+) -> list[dict[str, str]]:
+    prompt = _build_flashcard_prompt(document_text, num_cards, extra_prompt)
+    payload = _generate_json(prompt, api_key)
+    return _validate_flashcards(payload, num_cards)
 
 
 def generate_quiz(
@@ -61,87 +351,21 @@ def generate_quiz(
     fr_count: int = 1,
     class_name: str = "",
     learning_objectives: str = "",
-) -> list[dict]:
-    """
-    Generate quiz questions from document text.
-
-    Returns a list of dicts with this shape:
-        {
-            "question_type": "mc" | "fitb" | "free_response",
-            "question_text": "<the question>",
-            "answer_choices": [
-                {"choice_text": "<option>", "is_correct": True | False},
-                ...
-            ]
-            # free_response questions have answer_choices = []
-        }
-
-    MC questions:   4 answer_choices, exactly one is_correct=True.
-    FITB questions: 1 answer_choice with the correct fill-in word/phrase, is_correct=True.
-    FR questions:   answer_choices is empty — graded by Gemini after submission.
-
-    TODO (Gemini): Replace stub with something like:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        context_block = ""
-        if class_name:
-            context_block += f"Class: {class_name}\n"
-        if learning_objectives:
-            context_block += f"Learning objectives: {learning_objectives}\n"
-
-        prompt = (
-            f"{context_block}"
-            f"Difficulty: {difficulty}\n\n"
-            f"Using the text below, generate:\n"
-            f"  - {mc_count} multiple-choice questions (4 options each, mark the correct one)\n"
-            f"  - {fitb_count} fill-in-the-blank questions (provide the correct word/phrase)\n"
-            f"  - {fr_count} free-response questions (no answer needed)\n\n"
-            "Return a JSON array. Each item must have:\n"
-            "  question_type: 'mc' | 'fitb' | 'free_response'\n"
-            "  question_text: string\n"
-            "  answer_choices: array of {choice_text: string, is_correct: bool}\n"
-            "    (empty array for free_response)\n"
-            "Return only the JSON array.\n\n"
-            f"{document_text}"
-        )
-        response = model.generate_content(prompt)
-        return json.loads(response.text)
-    """
-    # ── STUB ────────────────────────────────────────────────────────────────
-    questions = []
-
-    for i in range(1, mc_count + 1):
-        questions.append({
-            "question_type": "mc",
-            "question_text": f"Sample multiple choice question {i}?",
-            "answer_choices": [
-                {"choice_text": "Option A — correct answer", "is_correct": True},
-                {"choice_text": "Option B", "is_correct": False},
-                {"choice_text": "Option C", "is_correct": False},
-                {"choice_text": "Option D", "is_correct": False},
-            ],
-        })
-
-    for i in range(1, fitb_count + 1):
-        questions.append({
-            "question_type": "fitb",
-            "question_text": f"The _____ is the sample fill-in-the-blank answer {i}.",
-            "answer_choices": [
-                {"choice_text": "answer", "is_correct": True},
-            ],
-        })
-
-    for i in range(1, fr_count + 1):
-        questions.append({
-            "question_type": "free_response",
-            "question_text": f"Explain the concept in sample free response question {i}.",
-            "answer_choices": [],  # No pre-stored answer; Gemini grades after submission.
-        })
-
-    return questions
-    # ── END STUB ─────────────────────────────────────────────────────────────
-
-
-# ──────────────────────────── Free response grading ───────────
+    extra_prompt: str = "",
+    api_key: str | None = None,
+) -> list[dict[str, Any]]:
+    prompt = _build_quiz_prompt(
+        document_text=document_text,
+        difficulty=difficulty,
+        mc_count=mc_count,
+        fitb_count=fitb_count,
+        fr_count=fr_count,
+        class_name=class_name,
+        learning_objectives=learning_objectives,
+        extra_prompt=extra_prompt,
+    )
+    payload = _generate_json(prompt, api_key)
+    return _validate_quiz_questions(payload)
 
 
 def grade_free_response_batch(
@@ -149,70 +373,13 @@ def grade_free_response_batch(
     document_text: str = "",
     class_name: str = "",
     learning_objectives: str = "",
-) -> list[dict]:
-    """
-    Grade a list of free-response QuizQuestion objects using Gemini.
-
-    `questions` is a list of QuizQuestion model instances that already have
-    `user_answer` saved on them.
-
-    Returns a list of dicts (same order as input questions):
-        {
-            "is_correct": bool,    # True if the answer was satisfactory
-            "feedback":   str,     # Personalised feedback for the student, including
-                                   # what they got right, what they missed, and which
-                                   # topics to review. This is stored on the question
-                                   # and can be passed back to generate_quiz() as context
-                                   # when the student re-generates a quiz from the same doc.
-            "explanation": str,    # Model answer / ideal response shown in results.
-        }
-
-    TODO (Gemini): Replace stub with something like:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-
-        qa_block = ""
-        for i, q in enumerate(questions, 1):
-            qa_block += (
-                f"Q{i}: {q.question_text}\n"
-                f"Student answer: {q.user_answer}\n\n"
-            )
-
-        context_block = ""
-        if class_name:
-            context_block += f"Class: {class_name}\n"
-        if learning_objectives:
-            context_block += f"Learning objectives: {learning_objectives}\n"
-
-        prompt = (
-            f"{context_block}"
-            "You are grading free-response quiz questions. "
-            "For each question below, return a JSON array item with:\n"
-            "  is_correct: bool (true if the student demonstrated understanding)\n"
-            "  feedback: personalised note on what they got right/wrong and topics to review\n"
-            "  explanation: the ideal model answer\n\n"
-            "Source material:\n"
-            f"{document_text}\n\n"
-            "Questions and student answers:\n"
-            f"{qa_block}"
-            "Return only a JSON array with one item per question."
-        )
-        response = model.generate_content(prompt)
-        return json.loads(response.text)
-    """
-    # ── STUB ────────────────────────────────────────────────────────────────
-    return [
-        {
-            "is_correct": True,
-            "feedback": (
-                "Stub feedback: your answer has been noted. "
-                "When Gemini grading is enabled this will contain personalised feedback "
-                "including topics to review."
-            ),
-            "explanation": (
-                "Stub explanation: a model answer will appear here once "
-                "Gemini grading is implemented."
-            ),
-        }
-        for _ in questions
-    ]
-    # ── END STUB ─────────────────────────────────────────────────────────────
+    api_key: str | None = None,
+) -> list[dict[str, Any]]:
+    prompt = _build_free_response_prompt(
+        questions,
+        document_text=document_text,
+        class_name=class_name,
+        learning_objectives=learning_objectives,
+    )
+    payload = _generate_json(prompt, api_key)
+    return _validate_free_response_results(payload, len(questions))

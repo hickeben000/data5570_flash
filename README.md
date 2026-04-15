@@ -1,66 +1,83 @@
 # Flash
 
-Flash turns uploaded class materials into interactive study tools: flashcards and custom quizzes. This repo contains a **Django REST** backend and an **Expo (React Native)** frontend.
+Flash turns uploaded class materials into interactive study tools: flashcards and custom quizzes. This repo contains a Django REST backend and an Expo React Native frontend.
 
-## Prerequisites
+## What Works Now
 
-- **Backend:** Python 3.12+ (3.10+ should work)
-- **Frontend:** Node.js 20+ and npm (LTS recommended)
-- **Mobile dev:** Expo Go on a device, or an emulator; for a physical device, the app must reach your machine’s IP (see [Environment variables](#environment-variables))
+- Token-based auth with persisted mobile sessions
+- Course creation and course-specific document lists
+- Document creation by pasted text or file upload
+- Flashcard generation and flashcard review status updates
+- Quiz generation, submission, and graded results
+- Bring-your-own Gemini key flow: each user stores their key on-device and the app sends it only on AI-backed requests
+- EC2 deployment scaffolding for a hosted Django backend with SQLite on the instance
 
-## Backend setup (new environment)
+## Project Layout
 
-From the repository root:
+- `flash_backend/` Django project and API
+- `flash-app/` Expo frontend with Redux Toolkit
+- `deployment/` EC2, gunicorn, and nginx deployment artifacts
+
+## Backend Setup
+
+From the repo root:
 
 ```bash
 cd flash_backend
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r ../requirements.txt
+cp .env.example .env
 ```
 
-Alternatively, install only the backend file:
-
-```bash
-pip install -r requirements.txt
-```
-
-(from inside `flash_backend/` after activating the venv).
-
-Create a `.env` file in `flash_backend/` (it is gitignored). Minimum:
+Set the backend environment values in `flash_backend/.env`:
 
 ```env
-SECRET_KEY=your-secret-key-here
+SECRET_KEY=change-me
 DEBUG=True
-GEMINI_API_KEY=stub
+GEMINI_API_KEY=
+ALLOWED_HOSTS=127.0.0.1,localhost
+CORS_ALLOWED_ORIGINS=http://localhost:8081,http://127.0.0.1:8081,http://localhost:19006,http://127.0.0.1:19006
+CSRF_TRUSTED_ORIGINS=
+SECURE_SSL_REDIRECT=False
+REQUIRE_HTTPS_FOR_AI=False
 ```
 
-Apply migrations and run the API:
+Run migrations and start the API:
 
 ```bash
-cd flash_backend
-source venv/bin/activate
 python manage.py migrate
 python manage.py runserver
 ```
 
-The API is served at **http://127.0.0.1:8000/** with routes under **`/api/`** (for example, `POST /api/users/register/`).
+Useful endpoints:
 
-## Frontend setup (new environment)
+- `GET /api/health/`
+- `POST /api/users/register/`
+- `POST /api/users/login/`
+- `POST /api/documents/<id>/flashcards/`
+- `POST /api/documents/<id>/quizzes/`
+- `PUT /api/quizzes/<id>/submit/`
+
+## Frontend Setup
 
 ```bash
 cd flash-app
 npm install
+cp .env.example .env
 ```
 
-Create `flash-app/.env` if it does not exist:
+Set `flash-app/.env`:
 
 ```env
 API_URL=http://localhost:8000
 ```
 
-- **Android emulator:** use `http://10.0.2.2:8000` instead of `localhost` so the emulator can reach the host machine.
-- **Physical device on the same Wi‑Fi:** set `API_URL` to `http://<your-computer-LAN-IP>:8000` (and ensure the Django dev server listens on `0.0.0.0`, e.g. `python manage.py runserver 0.0.0.0:8000`).
+Notes:
+
+- Android emulator: use `http://10.0.2.2:8000`
+- Physical device: use `http://<your-computer-lan-ip>:8000`
+- The app stores the Gemini key locally on-device and sends it in `X-Gemini-Api-Key` only for AI generation/grading requests
 
 Start Expo:
 
@@ -68,56 +85,35 @@ Start Expo:
 npm start
 ```
 
-Then open in Expo Go, or run `npm run android` / `npm run ios` as needed.
+## Running Locally
 
-## Running backend and frontend together
+1. Start Django in `flash_backend/`
+2. Start Expo in `flash-app/`
+3. Register a user in the app
+4. Create a course
+5. Add a document by paste or file upload
+6. Save a Gemini key in Settings
+7. Generate flashcards or a quiz
 
-1. Terminal 1: activate the venv, `python manage.py runserver` (or `runserver 0.0.0.0:8000` for devices).
-2. Terminal 2: `cd flash-app && npm start`.
-
-Register a user via `POST /api/users/register/`, then log in from the app. Login returns a **real** DRF auth token; all API routes except register/login require authentication.
-
-## API contract (backend / Expo)
-
-**Authentication**
-
-- Header on every request (except `POST /api/users/register/` and `POST /api/users/login/`):
-
-  `Authorization: Token <token>`
-
-  (`<token>` is the string returned by login.)
-
-**Quiz submit** — `PUT /api/quizzes/<id>/submit/`
-
-- Body shape: `{ "answers": { "<question_id>": <value>, ... } }`
-- Keys are **string** question primary keys (e.g. `"42"`), as JSON object keys.
-- **Multiple choice (`mc`):** value must be the selected **`AnswerChoice` id** (string or number accepted by the client; server parses MC answers as choice id). Do **not** send the visible option text.
-- **Fill-in-the-blank (`fitb`):** value is the user’s plain text answer.
-- **Free response (`free_response`):** value is the user’s plain text answer.
-
-While taking a quiz, choice objects in the API **do not** include `is_correct`. After submit, the result payload includes full grading (including `is_correct` on choices where applicable).
-
-**Migrations**
-
-- If `flash_backend/core/models.py` changes, run from `flash_backend/` (venv active):
-
-  `python manage.py makemigrations && python manage.py migrate`
-
-**Smoke tests (local)**
+## Backend Tests
 
 ```bash
-cd flash_backend && source venv/bin/activate
+cd flash_backend
+source .venv/bin/activate
 python manage.py test core
 ```
 
-## Python dependencies
+## Deployment
 
-| Location | Purpose |
-|----------|---------|
-| [requirements.txt](requirements.txt) | Root file; includes [flash_backend/requirements.txt](flash_backend/requirements.txt) |
-| [flash_backend/requirements.txt](flash_backend/requirements.txt) | `django`, `djangorestframework`, `django-cors-headers`, `django-environ` |
+For the hosted-backend path, see [deployment/EC2_DEPLOY.md](deployment/EC2_DEPLOY.md).
 
-## Project layout
+Included deployment artifacts:
 
-- `flash_backend/` — Django project `flash_backend`, app `core`, SQLite DB in dev
-- `flash-app/` — Expo app, Redux Toolkit, React Navigation
+- [deployment/flash.service](deployment/flash.service)
+- [deployment/nginx-flash.conf](deployment/nginx-flash.conf)
+
+## Notes On Keys And HTTPS
+
+- BYOK is the primary model: users can use their own Gemini keys
+- In production, enable HTTPS before sending live Gemini keys through the app
+- Set `REQUIRE_HTTPS_FOR_AI=True` and `SECURE_SSL_REDIRECT=True` once TLS is configured

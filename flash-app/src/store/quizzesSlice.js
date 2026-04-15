@@ -1,24 +1,52 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import api from "../api/api";
+import { getGeminiApiKey } from "../utils/storage";
+
+async function getRequiredAiHeaders(message) {
+  const apiKey = await getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error(message);
+  }
+  return {
+    "X-Gemini-Api-Key": apiKey,
+  };
+}
 
 export const generateQuiz = createAsyncThunk(
   "quizzes/generate",
   async (
-    { documentId, difficulty, mc_count, fitb_count, fr_count },
+    {
+      documentId,
+      difficulty,
+      mc_count,
+      fitb_count,
+      fr_count,
+      class_name = "",
+      learning_objectives = "",
+      extra_prompt = "",
+    },
     { rejectWithValue }
   ) => {
     try {
-      const response = await api.post(`/documents/${documentId}/quizzes/`, {
-        difficulty,
-        mc_count,
-        fitb_count,
-        fr_count,
-      });
+      const headers = await getRequiredAiHeaders(
+        "Add your Gemini API key in Settings before generating a quiz."
+      );
+      const response = await api.post(
+        `/documents/${documentId}/quizzes/`,
+        {
+          difficulty,
+          mc_count,
+          fitb_count,
+          fr_count,
+          class_name,
+          learning_objectives,
+          extra_prompt,
+        },
+        { headers }
+      );
       return response.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data || "Failed to generate quiz"
-      );
+      return rejectWithValue(err.response?.data || err.message || "Failed to generate quiz");
     }
   }
 );
@@ -37,14 +65,26 @@ export const fetchQuiz = createAsyncThunk(
 
 export const submitQuiz = createAsyncThunk(
   "quizzes/submit",
-  async ({ quizId, answers }, { rejectWithValue }) => {
+  async ({ quizId, answers }, { rejectWithValue, getState }) => {
     try {
-      const response = await api.put(`/quizzes/${quizId}/submit/`, {
-        answers,
-      });
+      const questions = getState().quizzes.quiz?.questions || [];
+      const needsAiKey = questions.some(
+        (question) => question.question_type === "free_response"
+      );
+      const headers = needsAiKey
+        ? await getRequiredAiHeaders(
+            "Add your Gemini API key in Settings before submitting free-response answers."
+          )
+        : {};
+
+      const response = await api.put(
+        `/quizzes/${quizId}/submit/`,
+        { answers },
+        { headers }
+      );
       return response.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || "Failed to submit quiz");
+      return rejectWithValue(err.response?.data || err.message || "Failed to submit quiz");
     }
   }
 );
@@ -56,7 +96,11 @@ const quizzesSlice = createSlice({
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    clearQuizError(state) {
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(generateQuiz.pending, (state) => {
@@ -98,4 +142,5 @@ const quizzesSlice = createSlice({
   },
 });
 
+export const { clearQuizError } = quizzesSlice.actions;
 export default quizzesSlice.reducer;

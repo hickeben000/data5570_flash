@@ -7,51 +7,28 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Platform,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
+
 import { generateQuiz } from "../store/quizzesSlice";
-import * as SecureStore from "expo-secure-store";
+import formatError from "../utils/formatError";
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
 
 export default function QuizConfigScreen({ route, navigation }) {
   const { documentId } = route.params;
   const dispatch = useDispatch();
-  const { loading } = useSelector((state) => state.quizzes);
+  const { loading, error } = useSelector((state) => state.quizzes);
 
   const [difficulty, setDifficulty] = useState("medium");
   const [mcCount, setMcCount] = useState("2");
   const [fitbCount, setFitbCount] = useState("1");
   const [frCount, setFrCount] = useState("1");
+  const [className, setClassName] = useState("");
+  const [learningObjectives, setLearningObjectives] = useState("");
   const [extraPrompt, setExtraPrompt] = useState("");
 
-  // 🔥 NEW: Get API Key
-  const getApiKey = async () => {
-    try {
-      if (Platform.OS === "web") {
-        return localStorage.getItem("gemini_api_key");
-      } else {
-        return await SecureStore.getItemAsync("gemini_api_key");
-      }
-    } catch (error) {
-      console.error("Error retrieving API key:", error);
-      return null;
-    }
-  };
-
-  const handleGenerate = async () => {
-    // 🔥 STEP 1: Get API key
-    const apiKey = await getApiKey();
-
-    console.log("API KEY FROM SETTINGS:", apiKey);
-
-    if (!apiKey) {
-      alert("No API key found. Please add one in Settings.");
-      return;
-    }
-
-    // 🔥 STEP 2: Continue existing flow
+  const handleGenerate = () => {
     dispatch(
       generateQuiz({
         documentId,
@@ -59,7 +36,9 @@ export default function QuizConfigScreen({ route, navigation }) {
         mc_count: parseInt(mcCount, 10) || 0,
         fitb_count: parseInt(fitbCount, 10) || 0,
         fr_count: parseInt(frCount, 10) || 0,
-        extra_prompt: extraPrompt,
+        class_name: className.trim(),
+        learning_objectives: learningObjectives.trim(),
+        extra_prompt: extraPrompt.trim(),
       })
     ).then((action) => {
       if (action.meta.requestStatus === "fulfilled") {
@@ -69,27 +48,27 @@ export default function QuizConfigScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.heading}>Configure Quiz</Text>
+      <Text style={styles.subtitle}>
+        Your Gemini key stays on-device and is only sent with AI-backed quiz requests.
+      </Text>
 
       <Text style={styles.label}>Difficulty</Text>
       <View style={styles.row}>
-        {DIFFICULTIES.map((d) => (
+        {DIFFICULTIES.map((level) => (
           <TouchableOpacity
-            key={d}
-            style={[styles.chip, difficulty === d && styles.chipActive]}
-            onPress={() => setDifficulty(d)}
+            key={level}
+            style={[styles.chip, difficulty === level && styles.chipActive]}
+            onPress={() => setDifficulty(level)}
           >
             <Text
               style={[
                 styles.chipText,
-                difficulty === d && styles.chipTextActive,
+                difficulty === level && styles.chipTextActive,
               ]}
             >
-              {d.charAt(0).toUpperCase() + d.slice(1)}
+              {level.charAt(0).toUpperCase() + level.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -119,6 +98,23 @@ export default function QuizConfigScreen({ route, navigation }) {
         onChangeText={setFrCount}
       />
 
+      <Text style={styles.label}>Class name</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Example: Biology 101"
+        value={className}
+        onChangeText={setClassName}
+      />
+
+      <Text style={styles.label}>Learning objectives</Text>
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        multiline
+        placeholder="What should this quiz emphasize?"
+        value={learningObjectives}
+        onChangeText={setLearningObjectives}
+      />
+
       <Text style={styles.label}>Extra Instructions</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
@@ -127,6 +123,8 @@ export default function QuizConfigScreen({ route, navigation }) {
         value={extraPrompt}
         onChangeText={setExtraPrompt}
       />
+
+      {error ? <Text style={styles.error}>{formatError(error)}</Text> : null}
 
       <TouchableOpacity
         style={styles.button}
@@ -145,16 +143,21 @@ export default function QuizConfigScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f7fb" },
-  content: { padding: 24, paddingTop: 60 },
+  content: { padding: 24, paddingBottom: 40 },
   heading: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "800",
     color: "#1a1a2e",
-    marginBottom: 24,
+  },
+  subtitle: {
+    marginTop: 8,
+    marginBottom: 20,
+    color: "#666",
+    lineHeight: 22,
   },
   label: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#555",
     marginBottom: 6,
     marginTop: 12,
@@ -176,7 +179,7 @@ const styles = StyleSheet.create({
   chipTextActive: { color: "#fff" },
   input: {
     backgroundColor: "#fff",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 14,
     fontSize: 16,
     borderWidth: 1,
@@ -187,13 +190,16 @@ const styles = StyleSheet.create({
     minHeight: 110,
     textAlignVertical: "top",
   },
+  error: {
+    color: "#c0392b",
+    marginTop: 8,
+  },
   button: {
     backgroundColor: "#4361ee",
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 16,
     alignItems: "center",
     marginTop: 20,
-    marginBottom: 20,
   },
   buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });

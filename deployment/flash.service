@@ -1,0 +1,14 @@
+[Unit]
+Description=Flash Django Gunicorn Service
+After=network.target
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/flash_final/flash_backend
+EnvironmentFile=/home/ubuntu/flash_final/flash_backend/.env
+ExecStart=/home/ubuntu/flash_final/flash_backend/.venv/bin/gunicorn flash_backend.wsgi:application --bind 127.0.0.1:8000 --workers 3
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

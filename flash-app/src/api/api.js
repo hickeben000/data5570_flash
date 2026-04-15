@@ -1,8 +1,10 @@
 import axios from "axios";
 import { API_URL } from "@env";
 
+const resolvedApiUrl = (API_URL || "http://localhost:8000").replace(/\/$/, "");
+
 const api = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: `${resolvedApiUrl}/api`,
   headers: {
     "Content-Type": "application/json",
   },
