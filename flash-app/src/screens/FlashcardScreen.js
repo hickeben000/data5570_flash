@@ -17,7 +17,7 @@ import {
 import formatError from "../utils/formatError";
 
 export default function FlashcardScreen({ route }) {
-  const { deckId, documentId, numCards = 10, extraPrompt = "" } = route.params || {};
+  const { deckId, documentId, additionalDocumentIds = [], numCards = 10, extraPrompt = "" } = route.params || {};
   const dispatch = useDispatch();
   const { deck, loading, error } = useSelector((state) => state.flashcards);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -31,6 +31,7 @@ export default function FlashcardScreen({ route }) {
       dispatch(
         generateFlashcards({
           documentId,
+          additionalDocumentIds,
           numCards,
           extraPrompt,
         })
@@ -38,7 +39,7 @@ export default function FlashcardScreen({ route }) {
     }
     setCurrentIndex(0);
     setFlipped(false);
-  }, [dispatch, deckId, documentId, numCards, extraPrompt]);
+  }, [dispatch, deckId, documentId, additionalDocumentIds, numCards, extraPrompt]);
 
   if (loading && !deck) {
     return (

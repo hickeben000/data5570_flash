@@ -8,7 +8,14 @@ import {
 } from "react-native";
 
 export default function DocumentActionScreen({ route, navigation }) {
-  const { courseId, documentId, documentTitle } = route.params || {};
+  const { courseId, documentTitle } = route.params || {};
+  // Support both single-doc (documentId) and multi-doc (documentIds) navigation params.
+  const documentIds = route.params?.documentIds ?? (
+    route.params?.documentId != null ? [route.params.documentId] : []
+  );
+  const primaryDocumentId = documentIds[0];
+  const additionalDocumentIds = documentIds.slice(1);
+
   const [numCards, setNumCards] = useState("10");
   const [extraPrompt, setExtraPrompt] = useState("");
 
@@ -16,7 +23,9 @@ export default function DocumentActionScreen({ route, navigation }) {
     <View style={styles.container}>
       <Text style={styles.title}>Study Material Ready</Text>
       <Text style={styles.subtitle}>
-        {documentTitle || "Your document is saved. Choose what to generate next."}
+        {documentIds.length > 1
+          ? `Combining ${documentIds.length} documents`
+          : documentTitle || "Your document is saved. Choose what to generate next."}
       </Text>
 
       <View style={styles.card}>
@@ -43,7 +52,8 @@ export default function DocumentActionScreen({ route, navigation }) {
           onPress={() =>
             navigation.navigate("Flashcards", {
               courseId,
-              documentId,
+              documentId: primaryDocumentId,
+              additionalDocumentIds,
               documentTitle,
               numCards: parseInt(numCards, 10) || 10,
               extraPrompt,
@@ -59,7 +69,8 @@ export default function DocumentActionScreen({ route, navigation }) {
         onPress={() =>
           navigation.navigate("QuizConfig", {
             courseId,
-            documentId,
+            documentId: primaryDocumentId,
+            additionalDocumentIds,
             documentTitle,
           })
         }

@@ -42,6 +42,29 @@ from .serializers import (
 # ──────────────────────────── Helpers ─────────────────────────
 
 
+def _check_magic_bytes(file, name: str) -> None:
+    """
+    Validate file format against magic bytes.
+    Reads the first 4 bytes, then seeks back to 0 so callers see the full file.
+    Raises ValueError with a user-facing message on mismatch.
+    """
+    header = file.read(4)
+    file.seek(0)
+    if name.endswith(".pdf") and not header.startswith(b"%PDF"):
+        raise ValueError(
+            "The uploaded file does not appear to be a valid PDF."
+        )
+    if name.endswith(".docx") and not header.startswith(b"PK"):
+        raise ValueError(
+            "The uploaded file does not appear to be a valid DOCX file."
+        )
+
+
+def _truncate_text(text: str) -> str:
+    limit = getattr(settings, "MAX_DOCUMENT_CHARS", 100_000)
+    return text[:limit] if len(text) > limit else text
+
+
 def extract_text_from_file(file) -> str:
     """
     Extract plain text from an uploaded file.
@@ -49,22 +72,45 @@ def extract_text_from_file(file) -> str:
 
     TODO (enhancement): add support for .pptx (python-pptx) and images (pytesseract OCR)
                         if students upload slides or scanned notes.
+    TODO (enhancement): move extraction + AI calls to a background task queue (e.g. Celery)
+                        to avoid blocking the request thread on large files.
     """
     name = file.name.lower()
+    _check_magic_bytes(file, name)
 
     if name.endswith(".pdf"):
         import pypdf
         reader = pypdf.PdfReader(io.BytesIO(file.read()))
-        return "\n".join(page.extract_text() or "" for page in reader.pages)
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        if not text.strip():
+            raise ValueError(
+                "No text could be extracted from this PDF. "
+                "It may be a scanned image — try a text-based PDF."
+            )
+        return text
 
     elif name.endswith(".docx"):
         import docx
         doc = docx.Document(io.BytesIO(file.read()))
-        return "\n".join(para.text for para in doc.paragraphs)
+        parts = [para.text for para in doc.paragraphs]
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    if cell.text.strip():
+                        parts.append(cell.text)
+        return "\n".join(parts)
 
     else:
         # Fall back to reading as UTF-8 text (handles .txt and similar).
         return file.read().decode("utf-8", errors="replace")
+
+
+def _validate_upload_size(file) -> None:
+    """Raise ValueError if the uploaded file exceeds MAX_UPLOAD_BYTES."""
+    limit = getattr(settings, "MAX_UPLOAD_BYTES", 20 * 1024 * 1024)
+    if file.size > limit:
+        mb = limit // (1024 * 1024)
+        raise ValueError(f"File is too large. Maximum allowed size is {mb} MB.")
 
 
 def get_course_for_user(course_id, user):
@@ -224,11 +270,18 @@ class DocumentListCreateView(APIView):
 
         uploaded_file = request.FILES.get("file")
         if uploaded_file:
-            data["raw_text"] = extract_text_from_file(uploaded_file)
+            try:
+                _validate_upload_size(uploaded_file)
+                raw_text = extract_text_from_file(uploaded_file)
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            data["raw_text"] = _truncate_text(raw_text)
             data["source_type"] = "upload"
             # Use the original filename as the title if none was provided.
             if not data.get("title"):
                 data["title"] = uploaded_file.name
+        elif "raw_text" in data:
+            data["raw_text"] = _truncate_text(data["raw_text"])
 
         serializer = DocumentSerializer(data=data)
         if serializer.is_valid():
@@ -256,10 +309,17 @@ class DocumentCreateView(APIView):
 
         uploaded_file = request.FILES.get("file")
         if uploaded_file:
-            data["raw_text"] = extract_text_from_file(uploaded_file)
+            try:
+                _validate_upload_size(uploaded_file)
+                raw_text = extract_text_from_file(uploaded_file)
+            except ValueError as exc:
+                return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            data["raw_text"] = _truncate_text(raw_text)
             data["source_type"] = "upload"
             if not data.get("title"):
                 data["title"] = uploaded_file.name
+        elif "raw_text" in data:
+            data["raw_text"] = _truncate_text(data["raw_text"])
 
         serializer = DocumentSerializer(data=data)
         if serializer.is_valid():
@@ -271,9 +331,23 @@ class DocumentCreateView(APIView):
 # ──────────────────────────── Flashcards ──────────────────────
 
 
+def _combine_document_texts(primary_doc, additional_ids, user) -> str:
+    """
+    Build combined raw_text from primary_doc plus any additional document IDs.
+    Each additional document is ownership-checked before its text is included.
+    The result is truncated to MAX_DOCUMENT_CHARS.
+    """
+    parts = [primary_doc.raw_text]
+    for doc_id in additional_ids:
+        extra_doc = get_document_for_user(doc_id, user)
+        parts.append(extra_doc.raw_text)
+    return _truncate_text("\n\n".join(parts))
+
+
 class GenerateFlashcardsView(APIView):
     def post(self, request, document_id):
         document = get_document_for_user(document_id, request.user)
+        additional_ids = request.data.get("additional_document_ids") or []
         try:
             validate_ai_request_security(request)
             num_cards = parse_int_field(
@@ -283,8 +357,9 @@ class GenerateFlashcardsView(APIView):
                 minimum=1,
             )
             extra_prompt = request.data.get("extra_prompt", "")
+            combined_text = _combine_document_texts(document, additional_ids, request.user)
             card_data = generate_flashcards(
-                document.raw_text,
+                combined_text,
                 num_cards=num_cards,
                 extra_prompt=extra_prompt,
                 api_key=get_request_api_key(request),
@@ -330,6 +405,7 @@ class FlashcardUpdateView(APIView):
 class GenerateQuizView(APIView):
     def post(self, request, document_id):
         document = get_document_for_user(document_id, request.user)
+        additional_ids = request.data.get("additional_document_ids") or []
         try:
             validate_ai_request_security(request)
             difficulty = request.data.get("difficulty", "medium")
@@ -357,9 +433,10 @@ class GenerateQuizView(APIView):
             class_name = request.data.get("class_name", "")
             learning_objectives = request.data.get("learning_objectives", "")
             extra_prompt = request.data.get("extra_prompt", "")
+            combined_text = _combine_document_texts(document, additional_ids, request.user)
 
             question_data = generate_quiz(
-                document.raw_text,
+                combined_text,
                 difficulty,
                 mc_count,
                 fitb_count,
