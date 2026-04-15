@@ -7,12 +7,6 @@ function buildUploadFormData({ course, title, file }) {
   if (title?.trim()) {
     formData.append("title", title.trim());
   }
-
-  if (file?.file) {
-    formData.append("file", file.file, file.name || "upload");
-    return formData;
-  }
-
   formData.append("file", {
     uri: file.uri,
     name: file.name || "upload",

@@ -14,12 +14,19 @@ async function getAiHeaders() {
 
 export const generateFlashcards = createAsyncThunk(
   "flashcards/generate",
-  async ({ documentId, numCards = 10, extraPrompt = "" }, { rejectWithValue }) => {
+  async (
+    { documentId, additionalDocumentIds = [], numCards = 10, extraPrompt = "" },
+    { rejectWithValue }
+  ) => {
     try {
       const headers = await getAiHeaders();
       const response = await api.post(
         `/documents/${documentId}/flashcards/`,
-        { num_cards: numCards, extra_prompt: extraPrompt },
+        {
+          num_cards: numCards,
+          extra_prompt: extraPrompt,
+          additional_document_ids: additionalDocumentIds,
+        },
         { headers }
       );
       return response.data;

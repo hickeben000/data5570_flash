@@ -16,7 +16,7 @@ import formatError from "../utils/formatError";
 const DIFFICULTIES = ["easy", "medium", "hard"];
 
 export default function QuizConfigScreen({ route, navigation }) {
-  const { documentId } = route.params;
+  const { documentId, additionalDocumentIds = [] } = route.params;
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.quizzes);
 
@@ -32,6 +32,7 @@ export default function QuizConfigScreen({ route, navigation }) {
     dispatch(
       generateQuiz({
         documentId,
+        additionalDocumentIds,
         difficulty,
         mc_count: parseInt(mcCount, 10) || 0,
         fitb_count: parseInt(fitbCount, 10) || 0,

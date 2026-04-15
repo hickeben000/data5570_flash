@@ -17,6 +17,11 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 REQUIRE_HTTPS_FOR_AI = env.bool("REQUIRE_HTTPS_FOR_AI", default=not DEBUG)
 
+# Maximum size for uploaded files (bytes). Default 20 MB.
+MAX_UPLOAD_BYTES = env.int("MAX_UPLOAD_BYTES", default=20 * 1024 * 1024)
+# Maximum characters of document text passed to Gemini. Default 100 000.
+MAX_DOCUMENT_CHARS = env.int("MAX_DOCUMENT_CHARS", default=100_000)
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

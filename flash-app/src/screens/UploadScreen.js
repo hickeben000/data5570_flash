@@ -24,10 +24,16 @@ export default function UploadScreen({ route, navigation }) {
   const [file, setFile] = useState(null);
   const [statusText, setStatusText] = useState("Paste notes or choose a file.");
 
+  const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
+
   const handlePickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
+        type: [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "text/plain",
+        ],
         copyToCacheDirectory: true,
       });
       if (result.canceled) {
@@ -36,7 +42,14 @@ export default function UploadScreen({ route, navigation }) {
       }
 
       const selectedFile = result.assets?.[0];
+
+      if (selectedFile?.size > MAX_FILE_BYTES) {
+        setStatusText("File is too large. Please choose a file under 20 MB.");
+        return;
+      }
+
       setFile(selectedFile);
+      setRawText("");
       if (!title && selectedFile?.name) {
         setTitle(selectedFile.name.replace(/\.[^.]+$/, ""));
       }
@@ -55,6 +68,11 @@ export default function UploadScreen({ route, navigation }) {
 
     if (!file && !rawText.trim()) {
       setStatusText("Add pasted text or choose a file before submitting.");
+      return;
+    }
+
+    if (!file && !title.trim()) {
+      setStatusText("Please add a title for your pasted notes.");
       return;
     }
 
@@ -102,6 +120,10 @@ export default function UploadScreen({ route, navigation }) {
         value={rawText}
         onChangeText={(text) => {
           setRawText(text);
+          if (text && file) {
+            setFile(null);
+            setStatusText("Paste notes or choose a file.");
+          }
           dispatch(clearDocumentsError());
         }}
       />

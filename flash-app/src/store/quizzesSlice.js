@@ -17,6 +17,7 @@ export const generateQuiz = createAsyncThunk(
   async (
     {
       documentId,
+      additionalDocumentIds = [],
       difficulty,
       mc_count,
       fitb_count,
@@ -41,6 +42,7 @@ export const generateQuiz = createAsyncThunk(
           class_name,
           learning_objectives,
           extra_prompt,
+          additional_document_ids: additionalDocumentIds,
         },
         { headers }
       );
