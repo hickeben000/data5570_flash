@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { registerUser } from "../store/authSlice";
+import formatError from "../utils/formatError";
 
 export default function RegisterScreen({ navigation }) {
   const [username, setUsername] = useState("");
@@ -29,7 +30,7 @@ export default function RegisterScreen({ navigation }) {
     <View style={styles.container}>
       <Text style={styles.heading}>Create Account</Text>
 
-      {error ? <Text style={styles.error}>{JSON.stringify(error)}</Text> : null}
+      {error ? <Text style={styles.error}>{formatError(error)}</Text> : null}
 
       <TextInput
         style={styles.input}

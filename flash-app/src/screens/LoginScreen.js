@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { clearError, loginUser } from "../store/authSlice";
+import formatError from "../utils/formatError";
 
 export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState("");
@@ -17,11 +18,7 @@ export default function LoginScreen({ navigation }) {
   const { loading, error } = useSelector((state) => state.auth);
 
   const handleLogin = () => {
-    dispatch(loginUser({ username, password })).then((action) => {
-      if (action.meta.requestStatus === "fulfilled") {
-        navigation.replace("MainApp");
-      }
-    });
+    dispatch(loginUser({ username, password }));
   };
 
   return (
@@ -29,7 +26,7 @@ export default function LoginScreen({ navigation }) {
       <Text style={styles.heading}>Flash</Text>
       <Text style={styles.subheading}>Study smarter, not harder</Text>
 
-      {error ? <Text style={styles.error}>{JSON.stringify(error)}</Text> : null}
+      {error ? <Text style={styles.error}>{formatError(error)}</Text> : null}
 
       <TextInput
         style={styles.input}

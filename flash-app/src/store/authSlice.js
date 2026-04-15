@@ -1,5 +1,23 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import api, { setAuthToken } from "../api/api";
+import {
+  clearSession,
+  loadSession,
+  persistSession,
+} from "../utils/storage";
+
+export const restoreSession = createAsyncThunk(
+  "auth/restoreSession",
+  async () => {
+    const session = await loadSession();
+    if (session?.token) {
+      setAuthToken(session.token);
+    } else {
+      setAuthToken(null);
+    }
+    return session;
+  }
+);
 
 export const registerUser = createAsyncThunk(
   "auth/register",
@@ -22,13 +40,26 @@ export const loginUser = createAsyncThunk(
   async ({ username, password }, { rejectWithValue }) => {
     try {
       const response = await api.post("/users/login/", { username, password });
-      setAuthToken(response.data.token);
-      return response.data;
+      const session = {
+        token: response.data.token,
+        user: {
+          id: response.data.user_id,
+          username: response.data.username,
+        },
+      };
+      setAuthToken(session.token);
+      await persistSession(session);
+      return session;
     } catch (err) {
       return rejectWithValue(err.response?.data || "Login failed");
     }
   }
 );
+
+export const logoutUser = createAsyncThunk("auth/logout", async () => {
+  await clearSession();
+  setAuthToken(null);
+});
 
 const authSlice = createSlice({
   name: "auth",
@@ -36,27 +67,35 @@ const authSlice = createSlice({
     user: null,
     token: null,
     loading: false,
+    bootstrapping: true,
     error: null,
   },
   reducers: {
-    logout(state) {
-      state.user = null;
-      state.token = null;
-      setAuthToken(null);
-    },
     clearError(state) {
       state.error = null;
     },
   },
   extraReducers: (builder) => {
     builder
+      .addCase(restoreSession.pending, (state) => {
+        state.bootstrapping = true;
+      })
+      .addCase(restoreSession.fulfilled, (state, action) => {
+        state.bootstrapping = false;
+        state.token = action.payload?.token || null;
+        state.user = action.payload?.user || null;
+      })
+      .addCase(restoreSession.rejected, (state) => {
+        state.bootstrapping = false;
+        state.token = null;
+        state.user = null;
+      })
       .addCase(registerUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(registerUser.fulfilled, (state, action) => {
+      .addCase(registerUser.fulfilled, (state) => {
         state.loading = false;
-        state.user = action.payload;
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -69,17 +108,26 @@ const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.token = action.payload.token;
-        state.user = {
-          id: action.payload.user_id,
-          username: action.payload.username,
-        };
+        state.user = action.payload.user;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      .addCase(logoutUser.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.token = null;
+        state.error = null;
+      })
+      .addCase(logoutUser.rejected, (state) => {
+        state.loading = false;
       });
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { clearError } = authSlice.actions;
 export default authSlice.reducer;

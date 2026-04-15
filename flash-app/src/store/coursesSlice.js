@@ -32,7 +32,11 @@ const coursesSlice = createSlice({
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    clearCoursesError(state) {
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchCourses.pending, (state) => {
@@ -62,4 +66,5 @@ const coursesSlice = createSlice({
   },
 });
 
+export const { clearCoursesError } = coursesSlice.actions;
 export default coursesSlice.reducer;

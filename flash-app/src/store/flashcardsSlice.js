@@ -1,19 +1,30 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import api from "../api/api";
+import { getGeminiApiKey } from "../utils/storage";
+
+async function getAiHeaders() {
+  const apiKey = await getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error("Add your Gemini API key in Settings before generating flashcards.");
+  }
+  return {
+    "X-Gemini-Api-Key": apiKey,
+  };
+}
 
 export const generateFlashcards = createAsyncThunk(
   "flashcards/generate",
-  async ({ documentId, numCards = 10 }, { rejectWithValue }) => {
+  async ({ documentId, numCards = 10, extraPrompt = "" }, { rejectWithValue }) => {
     try {
+      const headers = await getAiHeaders();
       const response = await api.post(
         `/documents/${documentId}/flashcards/`,
-        { num_cards: numCards }
+        { num_cards: numCards, extra_prompt: extraPrompt },
+        { headers }
       );
       return response.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data || "Failed to generate flashcards"
-      );
+      return rejectWithValue(err.response?.data || err.message || "Failed to generate flashcards");
     }
   }
 );
@@ -25,9 +36,7 @@ export const fetchDeck = createAsyncThunk(
       const response = await api.get(`/flashcard-decks/${deckId}/`);
       return response.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data || "Failed to fetch flashcard deck"
-      );
+      return rejectWithValue(err.response?.data || "Failed to fetch flashcard deck");
     }
   }
 );
@@ -39,9 +48,7 @@ export const updateCardStatus = createAsyncThunk(
       const response = await api.put(`/flashcards/${cardId}/`, { status });
       return response.data;
     } catch (err) {
-      return rejectWithValue(
-        err.response?.data || "Failed to update card status"
-      );
+      return rejectWithValue(err.response?.data || "Failed to update card status");
     }
   }
 );
@@ -53,7 +60,11 @@ const flashcardsSlice = createSlice({
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    clearFlashcardsError(state) {
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(generateFlashcards.pending, (state) => {
@@ -80,17 +91,24 @@ const flashcardsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+      .addCase(updateCardStatus.pending, (state) => {
+        state.error = null;
+      })
       .addCase(updateCardStatus.fulfilled, (state, action) => {
         if (state.deck) {
-          const idx = state.deck.cards.findIndex(
-            (c) => c.id === action.payload.id
+          const index = state.deck.cards.findIndex(
+            (card) => card.id === action.payload.id
           );
-          if (idx !== -1) {
-            state.deck.cards[idx] = action.payload;
+          if (index !== -1) {
+            state.deck.cards[index] = action.payload;
           }
         }
+      })
+      .addCase(updateCardStatus.rejected, (state, action) => {
+        state.error = action.payload;
       });
   },
 });
 
+export const { clearFlashcardsError } = flashcardsSlice.actions;
 export default flashcardsSlice.reducer;
