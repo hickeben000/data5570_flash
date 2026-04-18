@@ -5,9 +5,6 @@ const resolvedApiUrl = (API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 const api = axios.create({
   baseURL: `${resolvedApiUrl}/api`,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 export const setAuthToken = (token) => {
