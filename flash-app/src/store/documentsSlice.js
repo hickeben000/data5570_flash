@@ -36,11 +36,13 @@ export const createDocument = createAsyncThunk(
     try {
       let response;
       if (file) {
-        response = await api.post("/documents/", buildUploadFormData({ course, title, file }), {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
+        // Send as multipart/form-data. No Content-Type is set on the axios instance,
+        // so React Native's native networking layer sets multipart/form-data with the
+        // correct boundary automatically when it serialises the FormData body.
+        response = await api.post(
+          "/documents/",
+          buildUploadFormData({ course, title, file })
+        );
       } else {
         response = await api.post("/documents/", {
           course,
