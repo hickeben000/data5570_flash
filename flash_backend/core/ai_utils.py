@@ -112,6 +112,30 @@ def _parse_json_response(raw_text: str) -> Any:
         raise AIResponseError("Gemini returned invalid JSON.") from exc
 
 
+def _provider_error_from_gemini_exception(exc: BaseException) -> AIProviderError:
+    """Map Google SDK / HTTP failures to stable, user-facing messages."""
+    try:
+        from google.api_core import exceptions as google_api_exceptions
+    except ImportError:
+        google_api_exceptions = None
+
+    if google_api_exceptions and isinstance(exc, google_api_exceptions.ResourceExhausted):
+        return AIProviderError(
+            "Gemini rate or quota limit reached (429). Wait a few minutes, avoid rapid "
+            "back-to-back requests, and check usage or billing for this API key in Google "
+            "AI Studio (https://aistudio.google.com) under API keys and quotas."
+        )
+
+    lowered = str(exc).lower()
+    if "429" in lowered or "quota" in lowered or "resource exhausted" in lowered:
+        return AIProviderError(
+            "Gemini rate or quota limit reached (429). Wait a few minutes, avoid rapid "
+            "back-to-back requests, and check usage or billing for this API key in Google "
+            "AI Studio (https://aistudio.google.com) under API keys and quotas."
+        )
+    return AIProviderError(f"Gemini request failed: {exc}")
+
+
 def _generate_raw_text(prompt: str, api_key: str | None) -> str:
     key = _resolve_api_key(api_key)
     model = _get_model(key)
@@ -126,9 +150,9 @@ def _generate_raw_text(prompt: str, api_key: str | None) -> str:
         try:
             response = model.generate_content(prompt)
         except Exception as exc:  # pragma: no cover - SDK/network failures vary.
-            raise AIProviderError(f"Gemini request failed: {exc}") from exc
+            raise _provider_error_from_gemini_exception(exc) from exc
     except Exception as exc:  # pragma: no cover - SDK/network failures vary.
-        raise AIProviderError(f"Gemini request failed: {exc}") from exc
+        raise _provider_error_from_gemini_exception(exc) from exc
 
     return _extract_response_text(response)
 
