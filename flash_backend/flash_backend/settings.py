@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -103,6 +104,8 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=_default_cors_origins,
 )
 CORS_ALLOW_ALL_ORIGINS = False
+# Flashcard/quiz requests send BYOK header; browsers preflight must allow it.
+CORS_ALLOW_HEADERS = list(default_headers) + ["x-gemini-api-key"]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

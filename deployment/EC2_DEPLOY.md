@@ -60,6 +60,8 @@ sudo systemctl start flash
 sudo systemctl restart nginx
 ```
 
+**Gemini / Gunicorn:** Flashcard and quiz generation can take longer than Gunicorn’s default **30s** worker timeout. If workers are killed mid-request, the mobile app often shows a generic **network error**. The bundled `deployment/flash.service` uses `--timeout 180`; if you start Gunicorn by hand, use the same (or similar) timeout flags.
+
 ## 7. Verify
 
 ```bash
