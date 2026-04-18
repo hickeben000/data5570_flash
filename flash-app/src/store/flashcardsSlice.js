@@ -1,16 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import api from "../api/api";
-import { getGeminiApiKey } from "../utils/storage";
-
-async function getAiHeaders() {
-  const apiKey = await getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error("Add your Gemini API key in Settings before generating flashcards.");
-  }
-  return {
-    "X-Gemini-Api-Key": apiKey,
-  };
-}
+import api, { getRequiredAiHeaders } from "../api/api";
 
 export const generateFlashcards = createAsyncThunk(
   "flashcards/generate",
@@ -19,11 +8,14 @@ export const generateFlashcards = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const headers = await getAiHeaders();
+      const headers = await getRequiredAiHeaders(
+        "Add your Gemini API key in Settings before generating flashcards."
+      );
+      const sanitizedNumCards = Math.max(1, parseInt(numCards, 10) || 10);
       const response = await api.post(
         `/documents/${documentId}/flashcards/`,
         {
-          num_cards: numCards,
+          num_cards: sanitizedNumCards,
           extra_prompt: extraPrompt,
           additional_document_ids: additionalDocumentIds,
         },

@@ -1,16 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import api from "../api/api";
-import { getGeminiApiKey } from "../utils/storage";
-
-async function getRequiredAiHeaders(message) {
-  const apiKey = await getGeminiApiKey();
-  if (!apiKey) {
-    throw new Error(message);
-  }
-  return {
-    "X-Gemini-Api-Key": apiKey,
-  };
-}
+import api, { getRequiredAiHeaders } from "../api/api";
 
 export const generateQuiz = createAsyncThunk(
   "quizzes/generate",
@@ -32,13 +21,19 @@ export const generateQuiz = createAsyncThunk(
       const headers = await getRequiredAiHeaders(
         "Add your Gemini API key in Settings before generating a quiz."
       );
+      const sanitizedMcCount = Math.max(0, parseInt(mc_count, 10) || 0);
+      const sanitizedFitbCount = Math.max(0, parseInt(fitb_count, 10) || 0);
+      const sanitizedFrCount = Math.max(0, parseInt(fr_count, 10) || 0);
+      if (sanitizedMcCount + sanitizedFitbCount + sanitizedFrCount <= 0) {
+        throw new Error("Choose at least one quiz question before generating.");
+      }
       const response = await api.post(
         `/documents/${documentId}/quizzes/`,
         {
           difficulty,
-          mc_count,
-          fitb_count,
-          fr_count,
+          mc_count: sanitizedMcCount,
+          fitb_count: sanitizedFitbCount,
+          fr_count: sanitizedFrCount,
           class_name,
           learning_objectives,
           extra_prompt,
