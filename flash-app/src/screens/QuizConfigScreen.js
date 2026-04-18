@@ -52,7 +52,7 @@ export default function QuizConfigScreen({ route, navigation }) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.heading}>Configure Quiz</Text>
       <Text style={styles.subtitle}>
-        Your Gemini key stays on-device and is only sent with AI-backed quiz requests.
+        Your OpenAI key stays on-device and is only sent with AI-backed quiz requests.
       </Text>
 
       <Text style={styles.label}>Difficulty</Text>

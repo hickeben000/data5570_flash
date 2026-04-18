@@ -1,8 +1,8 @@
 """
-AI utility functions powered by Google Gemini.
+AI utility functions powered by OpenAI.
 
-This module expects a Gemini API key either from the request header
-(`X-Gemini-Api-Key`) or, optionally, from `settings.GEMINI_API_KEY`.
+This module expects an OpenAI API key either from the request header
+(`X-OpenAI-Api-Key`) or, optionally, from `settings.OPENAI_API_KEY`.
 
 Each public function returns validated Python data structures that match the
 backend serializers and view expectations.
@@ -17,9 +17,11 @@ from typing import Any, Callable
 from django.conf import settings
 
 
-def _gemini_model_name() -> str:
-    name = getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash") or "gemini-2.0-flash"
+def _openai_model_name() -> str:
+    name = getattr(settings, "OPENAI_MODEL", "gpt-4o-mini") or "gpt-4o-mini"
     return str(name).strip()
+
+
 RAW_CONTEXT_MAX_CHARS = 18_000
 SUMMARY_CHUNK_SIZE = 12_000
 SUMMARY_MAX_CHARS = 8_000
@@ -31,61 +33,88 @@ class AIError(Exception):
 
 
 class AIConfigurationError(AIError):
-    """Raised when Gemini is unavailable due to missing configuration."""
+    """Raised when the AI provider is unavailable due to missing configuration."""
 
 
 class AIResponseError(AIError):
-    """Raised when Gemini returns malformed or unexpected data."""
+    """Raised when the AI model returns malformed or unexpected data."""
 
 
 class AIProviderError(AIError):
-    """Raised when the Gemini SDK fails to complete a request."""
+    """Raised when the OpenAI SDK fails to complete a request."""
 
 
 def _resolve_api_key(api_key: str | None) -> str:
-    resolved = (api_key or settings.GEMINI_API_KEY or "").strip()
+    resolved = (api_key or getattr(settings, "OPENAI_API_KEY", "") or "").strip()
     if not resolved:
         raise AIConfigurationError(
-            "A Gemini API key is required. Add one in the app settings and retry."
+            "An OpenAI API key is required. Add one in the app settings and retry."
         )
     return resolved
 
 
-def _get_model(api_key: str):
+def _openai_client(api_key: str):
     try:
-        import google.generativeai as genai
+        import openai
     except ImportError as exc:
         raise AIConfigurationError(
-            "The Google Generative AI SDK is not installed on the backend."
+            "The OpenAI SDK is not installed on the backend."
         ) from exc
-
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(_gemini_model_name())
+    return openai.OpenAI(api_key=api_key)
 
 
-def _extract_response_text(response: Any) -> str:
-    text = getattr(response, "text", "")
-    if isinstance(text, str) and text.strip():
-        return text.strip()
+def _provider_error_from_openai_exception(exc: BaseException) -> AIProviderError:
+    """Map OpenAI SDK failures to stable, user-facing messages."""
+    try:
+        import openai as openai_lib
+    except ImportError:
+        openai_lib = None
 
-    candidates: list[str] = []
-    for candidate in getattr(response, "candidates", []) or []:
-        content = getattr(candidate, "content", None)
-        for part in getattr(content, "parts", []) or []:
-            value = getattr(part, "text", "")
-            if value:
-                candidates.append(value)
+    if openai_lib:
+        if isinstance(exc, openai_lib.RateLimitError):
+            return AIProviderError(
+                "OpenAI rate or quota limit reached (429). Wait a few seconds and retry. "
+                "Check usage and billing at https://platform.openai.com/usage."
+            )
+        if isinstance(exc, openai_lib.AuthenticationError):
+            return AIProviderError(
+                "OpenAI API key is invalid or expired. Check the key in Settings and retry."
+            )
 
-    joined = "\n".join(piece.strip() for piece in candidates if piece and piece.strip()).strip()
-    if joined:
-        return joined
-    raise AIResponseError("Gemini returned an empty response.")
+    lowered = str(exc).lower()
+    if "429" in lowered or "rate limit" in lowered or "quota" in lowered:
+        return AIProviderError(
+            "OpenAI rate or quota limit reached (429). Wait a few seconds and retry. "
+            "Check usage and billing at https://platform.openai.com/usage."
+        )
+    return AIProviderError(f"OpenAI request failed: {exc}")
+
+
+def _generate_raw_text(prompt: str, api_key: str | None) -> str:
+    key = _resolve_api_key(api_key)
+    client = _openai_client(key)
+
+    try:
+        response = client.chat.completions.create(
+            model=_openai_model_name(),
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+    except Exception as exc:  # pragma: no cover - SDK/network failures vary.
+        raise _provider_error_from_openai_exception(exc) from exc
+
+    content = response.choices[0].message.content or ""
+    if not content.strip():
+        raise AIResponseError("The AI model returned an empty response.")
+    return content.strip()
 
 
 def _extract_json_block(raw_text: str) -> str:
+    """Extract JSON from model output, handling optional markdown fences."""
     text = (raw_text or "").strip()
     if not text:
-        raise AIResponseError("Gemini returned an empty response.")
+        raise AIResponseError("The AI model returned an empty response.")
 
     fenced_match = re.search(r"```(?:json)?\s*(.*?)```", text, flags=re.DOTALL)
     if fenced_match:
@@ -101,7 +130,7 @@ def _extract_json_block(raw_text: str) -> str:
     if obj_start != -1 and obj_end != -1 and obj_end > obj_start:
         return text[obj_start : obj_end + 1].strip()
 
-    raise AIResponseError("Gemini did not return JSON.")
+    raise AIResponseError("The AI model did not return valid JSON.")
 
 
 def _parse_json_response(raw_text: str) -> Any:
@@ -109,52 +138,7 @@ def _parse_json_response(raw_text: str) -> Any:
     try:
         return json.loads(json_text)
     except json.JSONDecodeError as exc:
-        raise AIResponseError("Gemini returned invalid JSON.") from exc
-
-
-def _provider_error_from_gemini_exception(exc: BaseException) -> AIProviderError:
-    """Map Google SDK / HTTP failures to stable, user-facing messages."""
-    try:
-        from google.api_core import exceptions as google_api_exceptions
-    except ImportError:
-        google_api_exceptions = None
-
-    if google_api_exceptions and isinstance(exc, google_api_exceptions.ResourceExhausted):
-        return AIProviderError(
-            "Gemini rate or quota limit reached (429). Wait a few minutes, avoid rapid "
-            "back-to-back requests, and check usage or billing for this API key in Google "
-            "AI Studio (https://aistudio.google.com) under API keys and quotas."
-        )
-
-    lowered = str(exc).lower()
-    if "429" in lowered or "quota" in lowered or "resource exhausted" in lowered:
-        return AIProviderError(
-            "Gemini rate or quota limit reached (429). Wait a few minutes, avoid rapid "
-            "back-to-back requests, and check usage or billing for this API key in Google "
-            "AI Studio (https://aistudio.google.com) under API keys and quotas."
-        )
-    return AIProviderError(f"Gemini request failed: {exc}")
-
-
-def _generate_raw_text(prompt: str, api_key: str | None) -> str:
-    key = _resolve_api_key(api_key)
-    model = _get_model(key)
-    generation_config = {
-        "temperature": 0.2,
-        "response_mime_type": "application/json",
-    }
-
-    try:
-        response = model.generate_content(prompt, generation_config=generation_config)
-    except TypeError:
-        try:
-            response = model.generate_content(prompt)
-        except Exception as exc:  # pragma: no cover - SDK/network failures vary.
-            raise _provider_error_from_gemini_exception(exc) from exc
-    except Exception as exc:  # pragma: no cover - SDK/network failures vary.
-        raise _provider_error_from_gemini_exception(exc) from exc
-
-    return _extract_response_text(response)
+        raise AIResponseError("The AI model returned invalid JSON.") from exc
 
 
 def _generate_json(prompt: str, api_key: str | None) -> Any:
@@ -183,7 +167,7 @@ def _normalize_for_uniqueness(value: str) -> str:
 
 def _validate_flashcards(payload: Any, expected_count: int) -> list[dict[str, str]]:
     if not isinstance(payload, list):
-        raise AIResponseError("Gemini must return a JSON array of flashcards.")
+        raise AIResponseError("The AI model must return a JSON array of flashcards.")
 
     cards = []
     seen_fronts: set[str] = set()
@@ -201,7 +185,7 @@ def _validate_flashcards(payload: Any, expected_count: int) -> list[dict[str, st
 
     if len(cards) != expected_count:
         raise AIResponseError(
-            f"Gemini returned {len(cards)} flashcards, expected {expected_count}."
+            f"The AI model returned {len(cards)} flashcards, expected {expected_count}."
         )
     return cards
 
@@ -214,7 +198,7 @@ def _validate_quiz_questions(
     fr_count: int,
 ) -> list[dict[str, Any]]:
     if not isinstance(payload, list):
-        raise AIResponseError("Gemini must return a JSON array of quiz questions.")
+        raise AIResponseError("The AI model must return a JSON array of quiz questions.")
 
     validated_questions: list[dict[str, Any]] = []
     seen_questions: set[str] = set()
@@ -284,20 +268,20 @@ def _validate_quiz_questions(
     expected_total = mc_count + fitb_count + fr_count
     if len(validated_questions) != expected_total:
         raise AIResponseError(
-            f"Gemini returned {len(validated_questions)} quiz questions, expected {expected_total}."
+            f"The AI model returned {len(validated_questions)} quiz questions, expected {expected_total}."
         )
 
     if actual_counts["mc"] != mc_count:
         raise AIResponseError(
-            f"Gemini returned {actual_counts['mc']} multiple-choice questions, expected {mc_count}."
+            f"The AI model returned {actual_counts['mc']} multiple-choice questions, expected {mc_count}."
         )
     if actual_counts["fitb"] != fitb_count:
         raise AIResponseError(
-            f"Gemini returned {actual_counts['fitb']} fill-in-the-blank questions, expected {fitb_count}."
+            f"The AI model returned {actual_counts['fitb']} fill-in-the-blank questions, expected {fitb_count}."
         )
     if actual_counts["free_response"] != fr_count:
         raise AIResponseError(
-            f"Gemini returned {actual_counts['free_response']} free-response questions, expected {fr_count}."
+            f"The AI model returned {actual_counts['free_response']} free-response questions, expected {fr_count}."
         )
 
     return validated_questions
@@ -324,7 +308,7 @@ def _validate_string_list(payload: Any, *, field_name: str) -> list[str]:
 
 def _validate_summary_payload(payload: Any) -> str:
     if not isinstance(payload, dict):
-        raise AIResponseError("Gemini must return a JSON object for the summary.")
+        raise AIResponseError("The AI model must return a JSON object for the summary.")
     summary = _validate_non_empty_string(payload.get("summary"), "summary")
     return summary[:SUMMARY_MAX_CHARS]
 
@@ -332,11 +316,11 @@ def _validate_summary_payload(payload: Any) -> str:
 def _validate_free_response_results(payload: Any, expected_count: int) -> list[dict[str, Any]]:
     if not isinstance(payload, list):
         raise AIResponseError(
-            "Gemini must return a JSON array when grading free-response questions."
+            "The AI model must return a JSON array when grading free-response questions."
         )
     if len(payload) != expected_count:
         raise AIResponseError(
-            f"Gemini returned {len(payload)} grading results, expected {expected_count}."
+            f"The AI model returned {len(payload)} grading results, expected {expected_count}."
         )
 
     validated_results = []
@@ -425,7 +409,7 @@ def _generate_with_repair(
             )
 
     raise AIResponseError(
-        f"Gemini returned unusable JSON after {MAX_REPAIR_ATTEMPTS + 1} attempts: {last_error}"
+        f"The AI model returned unusable JSON after {MAX_REPAIR_ATTEMPTS + 1} attempts: {last_error}"
     )
 
 

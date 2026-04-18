@@ -1,6 +1,6 @@
 import axios from "axios";
 import { API_URL } from "@env";
-import { getGeminiApiKey } from "../utils/storage";
+import { getOpenAIApiKey } from "../utils/storage";
 
 const resolvedApiUrl = (API_URL || "http://localhost:8000").replace(/\/$/, "");
 
@@ -17,12 +17,12 @@ export const setAuthToken = (token) => {
 };
 
 export async function getRequiredAiHeaders(message) {
-  const apiKey = await getGeminiApiKey();
+  const apiKey = await getOpenAIApiKey();
   if (!apiKey) {
     throw new Error(message);
   }
   return {
-    "X-Gemini-Api-Key": apiKey,
+    "X-OpenAI-Api-Key": apiKey,
   };
 }
 

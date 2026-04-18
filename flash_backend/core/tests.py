@@ -124,7 +124,7 @@ class OwnershipTest(APITestCase):
                 "fr_count": 1,
             },
             format="json",
-            HTTP_X_GEMINI_API_KEY="test-key",
+            HTTP_X_OPENAI_API_KEY="test-key",
             HTTP_X_FORWARDED_PROTO="https",
         )
         self.assertEqual(quiz.status_code, status.HTTP_201_CREATED)
@@ -163,7 +163,7 @@ class OwnershipTest(APITestCase):
                 f"/api/quizzes/{quiz_id}/submit/",
                 {"answers": {}},
                 format="json",
-                HTTP_X_GEMINI_API_KEY="test-key",
+                HTTP_X_OPENAI_API_KEY="test-key",
                 HTTP_X_FORWARDED_PROTO="https",
             ).status_code,
             status.HTTP_404_NOT_FOUND,
@@ -271,7 +271,7 @@ class QuizContractTest(APITestCase):
                 "extra_prompt": "Focus on core terms only.",
             },
             format="json",
-            HTTP_X_GEMINI_API_KEY="test-key",
+            HTTP_X_OPENAI_API_KEY="test-key",
             HTTP_X_FORWARDED_PROTO="https",
         )
         self.assertEqual(quiz_gen.status_code, status.HTTP_201_CREATED)
@@ -313,7 +313,7 @@ class QuizContractTest(APITestCase):
                 }
             },
             format="json",
-            HTTP_X_GEMINI_API_KEY="test-key",
+            HTTP_X_OPENAI_API_KEY="test-key",
             HTTP_X_FORWARDED_PROTO="https",
         )
         self.assertEqual(submit.status_code, status.HTTP_200_OK)
@@ -354,7 +354,7 @@ class AIRequestTest(APITestCase):
         )
         self.document_id = document.data["id"]
 
-    @override_settings(GEMINI_API_KEY="")
+    @override_settings(OPENAI_API_KEY="")
     def test_generation_requires_api_key_when_backend_default_missing(self):
         response = self.client.post(
             f"/api/documents/{self.document_id}/flashcards/",
@@ -362,7 +362,7 @@ class AIRequestTest(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("Gemini API key", response.data["error"])
+        self.assertIn("OpenAI API key", response.data["error"])
 
     @patch("core.views.generate_flashcards", return_value=SAMPLE_FLASHCARDS)
     def test_flashcard_generation_supports_additional_documents(self, mock_generate_flashcards):
@@ -385,7 +385,7 @@ class AIRequestTest(APITestCase):
                 "additional_document_ids": [extra_document.data["id"]],
             },
             format="json",
-            HTTP_X_GEMINI_API_KEY="test-key",
+            HTTP_X_OPENAI_API_KEY="test-key",
             HTTP_X_FORWARDED_PROTO="https",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -405,7 +405,7 @@ class AIRequestTest(APITestCase):
                 "fr_count": 0,
             },
             format="json",
-            HTTP_X_GEMINI_API_KEY="test-key",
+            HTTP_X_OPENAI_API_KEY="test-key",
             HTTP_X_FORWARDED_PROTO="https",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

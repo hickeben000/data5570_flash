@@ -11,9 +11,9 @@ import { useDispatch, useSelector } from "react-redux";
 
 import { logoutUser } from "../store/authSlice";
 import {
-  clearGeminiApiKey,
-  getGeminiApiKey,
-  setGeminiApiKey,
+  clearOpenAIApiKey,
+  getOpenAIApiKey,
+  setOpenAIApiKey,
 } from "../utils/storage";
 
 export default function SettingsScreen() {
@@ -24,12 +24,12 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     const loadApiKey = async () => {
-      const savedKey = await getGeminiApiKey();
+      const savedKey = await getOpenAIApiKey();
       if (savedKey) {
         setApiKeyInput(savedKey);
-        setStatusMessage("Your Gemini key is stored only on this device.");
+        setStatusMessage("Your OpenAI key is stored only on this device.");
       } else {
-        setStatusMessage("No Gemini key saved yet.");
+        setStatusMessage("No OpenAI key saved yet.");
       }
     };
 
@@ -37,14 +37,14 @@ export default function SettingsScreen() {
   }, []);
 
   const handleSave = async () => {
-    await setGeminiApiKey(apiKey);
-    setStatusMessage("Gemini key saved on this device.");
+    await setOpenAIApiKey(apiKey);
+    setStatusMessage("OpenAI key saved on this device.");
   };
 
   const handleClear = async () => {
-    await clearGeminiApiKey();
+    await clearOpenAIApiKey();
     setApiKeyInput("");
-    setStatusMessage("Gemini key removed from this device.");
+    setStatusMessage("OpenAI key removed from this device.");
   };
 
   return (
@@ -61,7 +61,7 @@ export default function SettingsScreen() {
       ) : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Gemini API Key</Text>
+        <Text style={styles.sectionTitle}>OpenAI API Key</Text>
         <View style={styles.card}>
           <Text style={styles.cardText}>
             Flash stores your key locally on this device and only attaches it to AI-backed requests.
@@ -69,7 +69,7 @@ export default function SettingsScreen() {
 
           <TextInput
             style={styles.input}
-            placeholder="Enter your Gemini API key"
+            placeholder="Enter your OpenAI API key (sk-...)"
             value={apiKey}
             onChangeText={setApiKeyInput}
             autoCapitalize="none"

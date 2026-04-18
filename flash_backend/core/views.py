@@ -151,7 +151,7 @@ def parse_int_field(value, *, default, field_name, minimum=0):
 
 
 def get_request_api_key(request):
-    return (request.headers.get("X-Gemini-Api-Key") or "").strip()
+    return (request.headers.get("X-OpenAI-Api-Key") or "").strip()
 
 
 def request_uses_https(request):
@@ -167,7 +167,7 @@ def validate_ai_request_security(request):
         and not request_uses_https(request)
     ):
         raise AIConfigurationError(
-            "Gemini requests must use HTTPS in deployed environments."
+            "AI requests must use HTTPS in deployed environments."
         )
 
 

@@ -19,7 +19,7 @@ export const generateQuiz = createAsyncThunk(
   ) => {
     try {
       const headers = await getRequiredAiHeaders(
-        "Add your Gemini API key in Settings before generating a quiz."
+        "Add your OpenAI API key in Settings before generating a quiz."
       );
       const sanitizedMcCount = Math.max(0, parseInt(mc_count, 10) || 0);
       const sanitizedFitbCount = Math.max(0, parseInt(fitb_count, 10) || 0);
@@ -70,7 +70,7 @@ export const submitQuiz = createAsyncThunk(
       );
       const headers = needsAiKey
         ? await getRequiredAiHeaders(
-            "Add your Gemini API key in Settings before submitting free-response answers."
+            "Add your OpenAI API key in Settings before submitting free-response answers."
           )
         : {};
 

@@ -9,7 +9,7 @@ export const generateFlashcards = createAsyncThunk(
   ) => {
     try {
       const headers = await getRequiredAiHeaders(
-        "Add your Gemini API key in Settings before generating flashcards."
+        "Add your OpenAI API key in Settings before generating flashcards."
       );
       const sanitizedNumCards = Math.max(1, parseInt(numCards, 10) || 10);
       const response = await api.post(

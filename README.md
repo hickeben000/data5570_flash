@@ -9,7 +9,7 @@ Flash turns uploaded class materials into interactive study tools: flashcards an
 - Document creation by pasted text or file upload
 - Flashcard generation and flashcard review status updates
 - Quiz generation, submission, and graded results
-- Bring-your-own Gemini key flow: each user stores their key on-device and the app sends it only on AI-backed requests
+- Bring-your-own OpenAI key flow: each user stores their key on-device and the app sends it only on AI-backed requests
 - EC2 deployment scaffolding for a hosted Django backend with SQLite on the instance
 
 ## Project Layout
@@ -35,7 +35,7 @@ Set the backend environment values in `flash_backend/.env`:
 ```env
 SECRET_KEY=change-me
 DEBUG=True
-GEMINI_API_KEY=
+OPENAI_API_KEY=
 ALLOWED_HOSTS=127.0.0.1,localhost
 CORS_ALLOWED_ORIGINS=http://localhost:8081,http://127.0.0.1:8081,http://localhost:19006,http://127.0.0.1:19006
 CSRF_TRUSTED_ORIGINS=
@@ -77,7 +77,7 @@ Notes:
 
 - Android emulator: use `http://10.0.2.2:8000`
 - Physical device: use `http://<your-computer-lan-ip>:8000`
-- The app stores the Gemini key locally on-device and sends it in `X-Gemini-Api-Key` only for AI generation/grading requests
+- The app stores the OpenAI key locally on-device and sends it in `X-OpenAI-Api-Key` only for AI generation/grading requests
 
 Start Expo:
 
@@ -92,7 +92,7 @@ npm start
 3. Register a user in the app
 4. Create a course
 5. Add a document by paste or file upload
-6. Save a Gemini key in Settings
+6. Save an OpenAI key in Settings
 7. Generate flashcards or a quiz
 
 ## Backend Tests
@@ -114,6 +114,6 @@ Included deployment artifacts:
 
 ## Notes On Keys And HTTPS
 
-- BYOK is the primary model: users can use their own Gemini keys
-- In production, enable HTTPS before sending live Gemini keys through the app
+- BYOK is the primary model: users can use their own OpenAI keys
+- In production, enable HTTPS before sending live OpenAI keys through the app
 - Set `REQUIRE_HTTPS_FOR_AI=True` and `SECURE_SSL_REDIRECT=True` once TLS is configured
