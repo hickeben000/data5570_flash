@@ -17,7 +17,9 @@ from typing import Any, Callable
 from django.conf import settings
 
 
-DEFAULT_MODEL = "gemini-1.5-flash"
+def _gemini_model_name() -> str:
+    name = getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash") or "gemini-2.0-flash"
+    return str(name).strip()
 RAW_CONTEXT_MAX_CHARS = 18_000
 SUMMARY_CHUNK_SIZE = 12_000
 SUMMARY_MAX_CHARS = 8_000
@@ -58,7 +60,7 @@ def _get_model(api_key: str):
         ) from exc
 
     genai.configure(api_key=api_key)
-    return genai.GenerativeModel(DEFAULT_MODEL)
+    return genai.GenerativeModel(_gemini_model_name())
 
 
 def _extract_response_text(response: Any) -> str:

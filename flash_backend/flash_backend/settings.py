@@ -14,6 +14,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
+# Model id for google-generativeai (e.g. gemini-2.0-flash). Older ids like
+# gemini-1.5-flash may 404 on current API versions — override if needed.
+GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-2.0-flash")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 REQUIRE_HTTPS_FOR_AI = env.bool("REQUIRE_HTTPS_FOR_AI", default=not DEBUG)
