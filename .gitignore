@@ -55,3 +55,10 @@ Thumbs.db
 # Build outputs if generated at repo root
 dist/
 web-build/
+
+.cursorrules
+.claude
+.cursor
+.cursor/plans
+
+.vscode
