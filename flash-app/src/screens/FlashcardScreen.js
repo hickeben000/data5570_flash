@@ -16,8 +16,14 @@ import {
 } from "../store/flashcardsSlice";
 import formatError from "../utils/formatError";
 
-export default function FlashcardScreen({ route }) {
-  const { deckId, documentId, additionalDocumentIds = [], numCards = 10, extraPrompt = "" } = route.params || {};
+export default function FlashcardScreen({ route, navigation }) {
+  const {
+    deckId,
+    documentId,
+    additionalDocumentIds = [],
+    numCards = 10,
+    extraPrompt = "",
+  } = route.params || {};
   const dispatch = useDispatch();
   const { deck, loading, error } = useSelector((state) => state.flashcards);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -44,6 +50,9 @@ export default function FlashcardScreen({ route }) {
   if (loading && !deck) {
     return (
       <View style={styles.center}>
+        <TouchableOpacity style={styles.backBtnCenter} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>← Back</Text>
+        </TouchableOpacity>
         <ActivityIndicator size="large" color="#4361ee" />
         <Text style={styles.loadingText}>Generating flashcards...</Text>
       </View>
@@ -53,6 +62,9 @@ export default function FlashcardScreen({ route }) {
   if (error && !deck) {
     return (
       <View style={styles.center}>
+        <TouchableOpacity style={styles.backBtnCenter} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>← Back</Text>
+        </TouchableOpacity>
         <Text style={styles.error}>{formatError(error)}</Text>
       </View>
     );
@@ -62,6 +74,9 @@ export default function FlashcardScreen({ route }) {
   if (cards.length === 0) {
     return (
       <View style={styles.center}>
+        <TouchableOpacity style={styles.backBtnCenter} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>← Back</Text>
+        </TouchableOpacity>
         <Text style={styles.emptyText}>No flashcards available yet.</Text>
       </View>
     );
@@ -86,10 +101,16 @@ export default function FlashcardScreen({ route }) {
 
   return (
     <View style={styles.container}>
+      <View style={styles.topRow}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.counter}>
+          {currentIndex + 1} / {cards.length}
+        </Text>
+      </View>
+
       <Text style={styles.heading}>{deck.title}</Text>
-      <Text style={styles.counter}>
-        Card {currentIndex + 1} of {cards.length}
-      </Text>
 
       {error ? <Text style={styles.inlineError}>{formatError(error)}</Text> : null}
 
@@ -117,13 +138,13 @@ export default function FlashcardScreen({ route }) {
           style={[styles.statusBtn, styles.knownBtn]}
           onPress={() => markCard("known")}
         >
-          <Text style={styles.statusBtnText}>Known</Text>
+          <Text style={styles.statusBtnText}>Known ✓</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.statusBtn, styles.reviewBtn]}
           onPress={() => markCard("review")}
         >
-          <Text style={styles.statusBtnText}>Review</Text>
+          <Text style={styles.statusBtnText}>Review ↩</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -161,17 +182,35 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 16,
   },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  backBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  backBtnCenter: {
+    marginBottom: 16,
+  },
+  backBtnText: {
+    color: "#4361ee",
+    fontWeight: "700",
+    fontSize: 16,
+  },
   heading: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800",
     color: "#1a1a2e",
     textAlign: "center",
+    marginBottom: 10,
   },
   counter: {
-    marginTop: 6,
-    marginBottom: 12,
-    textAlign: "center",
     color: "#6b7280",
+    fontWeight: "600",
+    fontSize: 14,
   },
   card: {
     flex: 1,
