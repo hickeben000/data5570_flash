@@ -26,6 +26,7 @@ from .models import (
     Flashcard,
     FlashcardDeck,
     Quiz,
+    QuizAttempt,
     QuizQuestion,
 )
 from .serializers import (
@@ -33,6 +34,8 @@ from .serializers import (
     DocumentSerializer,
     FlashcardDeckSerializer,
     FlashcardSerializer,
+    QuizAttemptSerializer,
+    QuizListSerializer,
     QuizResultSerializer,
     QuizSerializer,
     UserSerializer,
@@ -589,6 +592,75 @@ class QuizSubmitView(APIView):
         quiz.completed_at = timezone.now()
         quiz.save()
 
+        # Snapshot this attempt so history is preserved across retakes.
+        snapshot = []
+        for q in quiz.questions.all():
+            snapshot.append({
+                "question_id": q.id,
+                "question_text": q.question_text,
+                "question_type": q.question_type,
+                "user_answer": q.user_answer,
+                "is_correct": q.is_correct,
+                "explanation": q.explanation,
+                "feedback": q.feedback,
+            })
+        QuizAttempt.objects.create(
+            quiz=quiz,
+            score=quiz.score,
+            answers_snapshot=snapshot,
+        )
+
         # Return the full result serializer so the frontend gets graded answers.
         serializer = QuizResultSerializer(quiz)
+        return Response(serializer.data)
+
+
+# ──────────────────────────── Quiz history / retake ───────────────────────
+
+
+class QuizListView(APIView):
+    """GET /api/quizzes/ — all quizzes for the authenticated user, newest first."""
+
+    def get(self, request):
+        quizzes = (
+            Quiz.objects.filter(document__course__user=request.user)
+            .select_related("document")
+            .prefetch_related("attempts")
+            .order_by("-created_at")
+        )
+        serializer = QuizListSerializer(quizzes, many=True)
+        return Response(serializer.data)
+
+
+class QuizAttemptsView(APIView):
+    """GET /api/quizzes/<pk>/attempts/ — all attempts for a single quiz."""
+
+    def get(self, request, pk):
+        quiz = get_quiz_for_user(pk, request.user)
+        attempts = quiz.attempts.all()
+        serializer = QuizAttemptSerializer(attempts, many=True)
+        return Response(serializer.data)
+
+
+class QuizRetakeView(APIView):
+    """POST /api/quizzes/<pk>/retake/ — reset answers so the quiz can be taken again.
+
+    The questions and answer choices are kept; only the user-supplied answers,
+    grading fields, and quiz-level score/completed_at are cleared.
+    """
+
+    def post(self, request, pk):
+        quiz = get_quiz_for_user(pk, request.user)
+        quiz.score = None
+        quiz.completed_at = None
+        quiz.save()
+
+        quiz.questions.all().update(
+            user_answer=None,
+            is_correct=None,
+            explanation="",
+            feedback="",
+        )
+
+        serializer = QuizSerializer(quiz)
         return Response(serializer.data)

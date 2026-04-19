@@ -8,6 +8,7 @@ from .models import (
     Flashcard,
     FlashcardDeck,
     Quiz,
+    QuizAttempt,
     QuizQuestion,
 )
 
@@ -165,3 +166,39 @@ class QuizResultSerializer(serializers.ModelSerializer):
             "questions",
         ]
         read_only_fields = ["id", "created_at"]
+
+
+# ---------------------------------------------------------------------------
+# Quiz attempt serializers (history + retake feature)
+# ---------------------------------------------------------------------------
+
+class QuizAttemptSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuizAttempt
+        fields = ["id", "score", "taken_at", "answers_snapshot"]
+        read_only_fields = ["id", "taken_at"]
+
+
+class QuizListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for the quiz history list — no full question tree."""
+    document_title = serializers.CharField(source="document.title", read_only=True)
+    attempt_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Quiz
+        fields = [
+            "id",
+            "document",
+            "document_title",
+            "difficulty",
+            "class_name",
+            "learning_objectives",
+            "score",
+            "created_at",
+            "completed_at",
+            "attempt_count",
+        ]
+        read_only_fields = fields
+
+    def get_attempt_count(self, obj):
+        return obj.attempts.count()

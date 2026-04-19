@@ -86,20 +86,63 @@ export const submitQuiz = createAsyncThunk(
   }
 );
 
+export const fetchUserQuizzes = createAsyncThunk(
+  "quizzes/fetchAll",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/quizzes/");
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Failed to fetch quizzes");
+    }
+  }
+);
+
+export const fetchQuizAttempts = createAsyncThunk(
+  "quizzes/fetchAttempts",
+  async (quizId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/quizzes/${quizId}/attempts/`);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Failed to fetch attempts");
+    }
+  }
+);
+
+export const retakeQuiz = createAsyncThunk(
+  "quizzes/retake",
+  async (quizId, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/quizzes/${quizId}/retake/`);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Failed to reset quiz");
+    }
+  }
+);
+
 const quizzesSlice = createSlice({
   name: "quizzes",
   initialState: {
     quiz: null,
+    userQuizzes: [],
+    attempts: [],
     loading: false,
+    attemptsLoading: false,
     error: null,
   },
   reducers: {
     clearQuizError(state) {
       state.error = null;
     },
+    clearAttempts(state) {
+      state.attempts = [];
+    },
   },
   extraReducers: (builder) => {
     builder
+      // generate
       .addCase(generateQuiz.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -112,6 +155,7 @@ const quizzesSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+      // fetch single
       .addCase(fetchQuiz.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -124,6 +168,7 @@ const quizzesSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+      // submit
       .addCase(submitQuiz.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -135,9 +180,47 @@ const quizzesSlice = createSlice({
       .addCase(submitQuiz.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      // list all
+      .addCase(fetchUserQuizzes.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserQuizzes.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userQuizzes = action.payload;
+      })
+      .addCase(fetchUserQuizzes.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // attempts
+      .addCase(fetchQuizAttempts.pending, (state) => {
+        state.attemptsLoading = true;
+      })
+      .addCase(fetchQuizAttempts.fulfilled, (state, action) => {
+        state.attemptsLoading = false;
+        state.attempts = action.payload;
+      })
+      .addCase(fetchQuizAttempts.rejected, (state) => {
+        state.attemptsLoading = false;
+      })
+      // retake
+      .addCase(retakeQuiz.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(retakeQuiz.fulfilled, (state, action) => {
+        state.loading = false;
+        state.quiz = action.payload;
+        state.attempts = [];
+      })
+      .addCase(retakeQuiz.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });
 
-export const { clearQuizError } = quizzesSlice.actions;
+export const { clearQuizError, clearAttempts } = quizzesSlice.actions;
 export default quizzesSlice.reducer;

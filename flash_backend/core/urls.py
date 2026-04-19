@@ -41,10 +41,21 @@ urlpatterns = [
         views.GenerateQuizView.as_view(),
         name="generate-quiz",
     ),
+    path("quizzes/", views.QuizListView.as_view(), name="quiz-list"),
     path("quizzes/<int:pk>/", views.QuizDetailView.as_view(), name="quiz-detail"),
     path(
         "quizzes/<int:pk>/submit/",
         views.QuizSubmitView.as_view(),
         name="quiz-submit",
+    ),
+    path(
+        "quizzes/<int:pk>/attempts/",
+        views.QuizAttemptsView.as_view(),
+        name="quiz-attempts",
+    ),
+    path(
+        "quizzes/<int:pk>/retake/",
+        views.QuizRetakeView.as_view(),
+        name="quiz-retake",
     ),
 ]

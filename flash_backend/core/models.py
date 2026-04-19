@@ -123,6 +123,26 @@ class QuizQuestion(models.Model):
         return self.question_text[:50]
 
 
+class QuizAttempt(models.Model):
+    """
+    Snapshot of one completed quiz submission.
+    Created each time QuizSubmitView grades a quiz, preserving the full
+    answer history so users can review past attempts and retake freely.
+    """
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="attempts")
+    score = models.FloatField(null=True, blank=True)
+    taken_at = models.DateTimeField(auto_now_add=True)
+    # List of {question_id, question_text, question_type, user_answer,
+    #          is_correct, explanation, feedback}
+    answers_snapshot = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ["-taken_at"]
+
+    def __str__(self):
+        return f"Attempt #{self.pk} for Quiz {self.quiz_id} — {self.score}%"
+
+
 class AnswerChoice(models.Model):
     """
     One row per answer option for a QuizQuestion.
