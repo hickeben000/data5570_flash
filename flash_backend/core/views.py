@@ -280,8 +280,15 @@ class DocumentListCreateView(APIView):
             # Use the original filename as the title if none was provided.
             if not data.get("title"):
                 data["title"] = uploaded_file.name
-        elif "raw_text" in data:
+        elif data.get("raw_text", "").strip():
             data["raw_text"] = _truncate_text(data["raw_text"])
+            if not data.get("source_type"):
+                data["source_type"] = "paste"
+        else:
+            return Response(
+                {"error": "Provide either a file upload or pasted text."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = DocumentSerializer(data=data)
         if serializer.is_valid():
@@ -318,8 +325,15 @@ class DocumentCreateView(APIView):
             data["source_type"] = "upload"
             if not data.get("title"):
                 data["title"] = uploaded_file.name
-        elif "raw_text" in data:
+        elif data.get("raw_text", "").strip():
             data["raw_text"] = _truncate_text(data["raw_text"])
+            if not data.get("source_type"):
+                data["source_type"] = "paste"
+        else:
+            return Response(
+                {"error": "Provide either a file upload or pasted text."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = DocumentSerializer(data=data)
         if serializer.is_valid():
