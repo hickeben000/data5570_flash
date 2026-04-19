@@ -544,8 +544,18 @@ class QuizSubmitView(APIView):
                         user_answer.strip().lower()
                         == correct_choice.choice_text.strip().lower()
                     )
+                    if question.is_correct:
+                        question.explanation = (
+                            f'Correct! "{correct_choice.choice_text}" is the right answer.'
+                        )
+                    else:
+                        question.explanation = (
+                            f'The correct answer is "{correct_choice.choice_text}". '
+                            f'You answered "{user_answer.strip() or "(blank)"}".'
+                        )
                 else:
                     question.is_correct = False
+                    question.explanation = "No correct answer was stored for this question."
                 if question.is_correct:
                     auto_correct += 1
                 question.save()
