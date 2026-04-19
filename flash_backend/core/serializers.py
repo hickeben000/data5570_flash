@@ -36,6 +36,11 @@ class CourseSerializer(serializers.ModelSerializer):
 
 
 class DocumentSerializer(serializers.ModelSerializer):
+    # raw_text is optional at the serializer level because the views inject it
+    # from file extraction before validation runs.  The views still enforce that
+    # raw_text is non-empty when no file is uploaded (paste mode).
+    raw_text = serializers.CharField(required=False, allow_blank=False)
+
     class Meta:
         model = Document
         fields = ["id", "course", "title", "raw_text", "source_type", "uploaded_at"]

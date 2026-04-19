@@ -7,7 +7,7 @@ User=ubuntu
 Group=www-data
 WorkingDirectory=/home/ubuntu/flash_final/flash_backend
 EnvironmentFile=/home/ubuntu/flash_final/flash_backend/.env
-ExecStart=/home/ubuntu/flash_final/flash_backend/.venv/bin/gunicorn flash_backend.wsgi:application --bind 127.0.0.1:8000 --workers 3
+ExecStart=/home/ubuntu/flash_final/flash_backend/.venv/bin/gunicorn flash_backend.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 180 --graceful-timeout 30
 Restart=always
 
 [Install]

@@ -3,21 +3,26 @@ import api from "../api/api";
 
 function buildUploadFormData({ course, title, file }) {
   const formData = new FormData();
+
   formData.append("course", String(course));
+
   if (title?.trim()) {
     formData.append("title", title.trim());
   }
 
+  // KEY FIX: handle web vs mobile differently
   if (file?.file) {
-    formData.append("file", file.file, file.name || "upload");
-    return formData;
+    // Web
+    formData.append("file", file.file);
+  } else {
+    // Mobile
+    formData.append("file", {
+      uri: file.uri,
+      name: file.name || "upload",
+      type: file.mimeType || file.type || "application/octet-stream",
+    });
   }
 
-  formData.append("file", {
-    uri: file.uri,
-    name: file.name || "upload",
-    type: file.mimeType || file.type || "application/octet-stream",
-  });
   return formData;
 }
 
@@ -41,8 +46,11 @@ export const createDocument = createAsyncThunk(
   async ({ course, title, rawText, file }, { rejectWithValue }) => {
     try {
       let response;
+
       if (file) {
-        response = await api.post("/documents/", buildUploadFormData({ course, title, file }), {
+        const formData = buildUploadFormData({ course, title, file });
+
+        response = await api.post("/documents/", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
@@ -55,6 +63,7 @@ export const createDocument = createAsyncThunk(
           source_type: "paste",
         });
       }
+
       return response.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || "Failed to create document");

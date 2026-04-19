@@ -19,43 +19,81 @@ export default function UploadScreen({ route, navigation }) {
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.documents);
 
+  const [mode, setMode] = useState("upload"); // "upload" | "paste"
   const [title, setTitle] = useState("");
   const [rawText, setRawText] = useState("");
   const [file, setFile] = useState(null);
-  const [statusText, setStatusText] = useState("Paste notes or choose a file.");
+  const [fileStatus, setFileStatus] = useState("No file selected.");
+
+  const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+  const handleSwitchMode = (newMode) => {
+    if (newMode === mode) return;
+    setMode(newMode);
+    // Clear only the data belonging to the mode we're leaving.
+    if (newMode === "upload") {
+      setRawText("");
+    } else {
+      setFile(null);
+      setFileStatus("No file selected.");
+    }
+    dispatch(clearDocumentsError());
+  };
 
   const handlePickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
+        type: [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "text/plain",
+        ],
         copyToCacheDirectory: true,
       });
       if (result.canceled) {
-        setStatusText("Selection canceled.");
+        setFileStatus("Selection canceled.");
         return;
       }
 
       const selectedFile = result.assets?.[0];
+
+      if (selectedFile?.size > MAX_FILE_BYTES) {
+        setFileStatus("File is too large. Please choose a file under 20 MB.");
+        return;
+      }
+
       setFile(selectedFile);
       if (!title && selectedFile?.name) {
         setTitle(selectedFile.name.replace(/\.[^.]+$/, ""));
       }
-      setStatusText(`Selected ${selectedFile?.name || "file"}.`);
+      setFileStatus(`Selected: ${selectedFile?.name || "file"}`);
       dispatch(clearDocumentsError());
     } catch (_error) {
-      setStatusText("File selection failed.");
+      setFileStatus("File selection failed.");
     }
   };
 
   const handleSubmit = () => {
     if (!courseId) {
-      setStatusText("Open upload from a course so the document has somewhere to live.");
+      alert("Open upload from a course so the document has somewhere to live.");
       return;
     }
 
-    if (!file && !rawText.trim()) {
-      setStatusText("Add pasted text or choose a file before submitting.");
-      return;
+    if (mode === "upload") {
+      if (!file) {
+        setFileStatus("Choose a file before submitting.");
+        return;
+      }
+    } else {
+      if (!rawText.trim()) {
+        dispatch(clearDocumentsError());
+        alert("Paste your notes before submitting.");
+        return;
+      }
+      if (!title.trim()) {
+        alert("Please add a title for your pasted notes.");
+        return;
+      }
     }
 
     dispatch(
@@ -80,10 +118,33 @@ export default function UploadScreen({ route, navigation }) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Add Document</Text>
       <Text style={styles.subtitle}>
-        Paste notes directly or upload a file. The backend extracts the text and saves it to the selected course.
+        Upload a file and we'll extract the text, or paste the text yourself.
       </Text>
 
-      <Text style={styles.label}>Title</Text>
+      {/* Mode tabs */}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, mode === "upload" && styles.tabActive]}
+          onPress={() => handleSwitchMode("upload")}
+        >
+          <Text style={[styles.tabText, mode === "upload" && styles.tabTextActive]}>
+            Upload File
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, mode === "paste" && styles.tabActive]}
+          onPress={() => handleSwitchMode("paste")}
+        >
+          <Text style={[styles.tabText, mode === "paste" && styles.tabTextActive]}>
+            Paste Text
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Title — always shown; required for paste, auto-filled for upload */}
+      <Text style={styles.label}>
+        Title{mode === "paste" ? " *" : " (auto-filled from filename)"}
+      </Text>
       <TextInput
         style={styles.input}
         placeholder="Example: Chapter 3 Review"
@@ -94,25 +155,34 @@ export default function UploadScreen({ route, navigation }) {
         }}
       />
 
-      <Text style={styles.label}>Paste text</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Paste lecture notes, study guide text, or assignment content here."
-        multiline
-        value={rawText}
-        onChangeText={(text) => {
-          setRawText(text);
-          dispatch(clearDocumentsError());
-        }}
-      />
+      {/* Upload mode: file picker only */}
+      {mode === "upload" && (
+        <View style={styles.fileCard}>
+          <Text style={styles.fileStatus}>{fileStatus}</Text>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handlePickFile}>
+            <Text style={styles.secondaryButtonText}>
+              {file ? "Change File" : "Choose File"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      <View style={styles.fileCard}>
-        <Text style={styles.fileTitle}>File upload</Text>
-        <Text style={styles.fileStatus}>{statusText}</Text>
-        <TouchableOpacity style={styles.secondaryButton} onPress={handlePickFile}>
-          <Text style={styles.secondaryButtonText}>Choose File</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Paste mode: text area only */}
+      {mode === "paste" && (
+        <>
+          <Text style={styles.label}>Paste text *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Paste lecture notes, study guide text, or assignment content here."
+            multiline
+            value={rawText}
+            onChangeText={(text) => {
+              setRawText(text);
+              dispatch(clearDocumentsError());
+            }}
+          />
+        </>
+      )}
 
       {error ? <Text style={styles.error}>{formatError(error)}</Text> : null}
 
@@ -168,6 +238,29 @@ const styles = StyleSheet.create({
     minHeight: 180,
     textAlignVertical: "top",
   },
+  tabs: {
+    flexDirection: "row",
+    marginBottom: 20,
+    borderRadius: 12,
+    backgroundColor: "#eef1ff",
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 10,
+  },
+  tabActive: {
+    backgroundColor: "#4361ee",
+  },
+  tabText: {
+    fontWeight: "700",
+    color: "#4361ee",
+  },
+  tabTextActive: {
+    color: "#fff",
+  },
   fileCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -176,13 +269,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#dfe4f1",
   },
-  fileTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1a1a2e",
-  },
   fileStatus: {
-    marginTop: 8,
     marginBottom: 12,
     color: "#555",
   },

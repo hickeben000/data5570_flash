@@ -1,13 +1,11 @@
 import axios from "axios";
 import { API_URL } from "@env";
+import { getOpenAIApiKey } from "../utils/storage";
 
 const resolvedApiUrl = (API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 const api = axios.create({
   baseURL: `${resolvedApiUrl}/api`,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 export const setAuthToken = (token) => {
@@ -17,5 +15,15 @@ export const setAuthToken = (token) => {
     delete api.defaults.headers.common["Authorization"];
   }
 };
+
+export async function getRequiredAiHeaders(message) {
+  const apiKey = await getOpenAIApiKey();
+  if (!apiKey) {
+    throw new Error(message);
+  }
+  return {
+    "X-OpenAI-Api-Key": apiKey,
+  };
+}
 
 export default api;

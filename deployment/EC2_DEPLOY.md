@@ -37,7 +37,7 @@ Copy `flash_backend/.env.example` to `flash_backend/.env` and set:
 - `SECURE_SSL_REDIRECT=True` once TLS is configured
 - `REQUIRE_HTTPS_FOR_AI=True`
 
-Keep `GEMINI_API_KEY` empty if you want strict bring-your-own-key behavior. The app already supports per-user keys through the `X-Gemini-Api-Key` header.
+Keep `OPENAI_API_KEY` empty if you want strict bring-your-own-key behavior. The app already supports per-user keys through the `X-OpenAI-Api-Key` header.
 
 ## 5. Migrate and collect static assets
 
@@ -60,6 +60,8 @@ sudo systemctl start flash
 sudo systemctl restart nginx
 ```
 
+**AI / Gunicorn:** Flashcard and quiz generation can take longer than Gunicorn’s default **30s** worker timeout. If workers are killed mid-request, the mobile app often shows a generic **network error**. The bundled `deployment/flash.service` uses `--timeout 180`; if you start Gunicorn by hand, use the same (or similar) timeout flags.
+
 ## 7. Verify
 
 ```bash
@@ -74,7 +76,7 @@ Expected response:
 
 ## 8. Add TLS before using live BYOK traffic
 
-Because users can send their own Gemini keys, terminate HTTPS before real usage. A common path is Certbot with nginx:
+Because users can send their own OpenAI keys, terminate HTTPS before real usage. A common path is Certbot with nginx:
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx

@@ -13,7 +13,7 @@ import formatError from "../utils/formatError";
 
 function getCorrectAnswerText(question) {
   if (question.question_type === "free_response") {
-    return "Open-ended response graded by Gemini.";
+    return "Open-ended response graded by AI.";
   }
   const correctChoices = (question.answer_choices || [])
     .filter((choice) => choice.is_correct)

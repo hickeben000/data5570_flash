@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 
 const AUTH_TOKEN_KEY = "flash_auth_token";
 const AUTH_USER_KEY = "flash_auth_user";
-const GEMINI_API_KEY = "flash_gemini_api_key";
+const OPENAI_API_KEY_STORE = "flash_openai_api_key";
 
 async function getStoredValue(key) {
   if (Platform.OS === "web") {
@@ -56,14 +56,14 @@ export async function clearSession() {
   await deleteStoredValue(AUTH_USER_KEY);
 }
 
-export async function getGeminiApiKey() {
-  return (await getStoredValue(GEMINI_API_KEY)) || "";
+export async function getOpenAIApiKey() {
+  return (await getStoredValue(OPENAI_API_KEY_STORE)) || "";
 }
 
-export async function setGeminiApiKey(value) {
-  await setStoredValue(GEMINI_API_KEY, value.trim());
+export async function setOpenAIApiKey(value) {
+  await setStoredValue(OPENAI_API_KEY_STORE, value.trim());
 }
 
-export async function clearGeminiApiKey() {
-  await deleteStoredValue(GEMINI_API_KEY);
+export async function clearOpenAIApiKey() {
+  await deleteStoredValue(OPENAI_API_KEY_STORE);
 }

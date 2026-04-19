@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -12,10 +13,17 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
-GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+# OpenAI model id. gpt-4o-mini is capable and budget-friendly.
+OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 REQUIRE_HTTPS_FOR_AI = env.bool("REQUIRE_HTTPS_FOR_AI", default=not DEBUG)
+
+# Maximum size for uploaded files (bytes). Default 20 MB.
+MAX_UPLOAD_BYTES = env.int("MAX_UPLOAD_BYTES", default=20 * 1024 * 1024)
+# Maximum characters of document text passed to the AI model. Default 100 000.
+MAX_DOCUMENT_CHARS = env.int("MAX_DOCUMENT_CHARS", default=100_000)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -98,6 +106,8 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=_default_cors_origins,
 )
 CORS_ALLOW_ALL_ORIGINS = False
+# Flashcard/quiz requests send BYOK header; browsers preflight must allow it.
+CORS_ALLOW_HEADERS = list(default_headers) + ["x-openai-api-key"]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

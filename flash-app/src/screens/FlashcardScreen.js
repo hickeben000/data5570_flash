@@ -17,7 +17,13 @@ import {
 import formatError from "../utils/formatError";
 
 export default function FlashcardScreen({ route, navigation }) {
-  const { deckId, documentId, numCards = 10, extraPrompt = "" } = route.params || {};
+  const {
+    deckId,
+    documentId,
+    additionalDocumentIds = [],
+    numCards = 10,
+    extraPrompt = "",
+  } = route.params || {};
   const dispatch = useDispatch();
   const { deck, loading, error } = useSelector((state) => state.flashcards);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -31,6 +37,7 @@ export default function FlashcardScreen({ route, navigation }) {
       dispatch(
         generateFlashcards({
           documentId,
+          additionalDocumentIds,
           numCards,
           extraPrompt,
         })
@@ -38,11 +45,14 @@ export default function FlashcardScreen({ route, navigation }) {
     }
     setCurrentIndex(0);
     setFlipped(false);
-  }, [dispatch, deckId, documentId, numCards, extraPrompt]);
+  }, [dispatch, deckId, documentId, additionalDocumentIds, numCards, extraPrompt]);
 
   if (loading && !deck) {
     return (
       <View style={styles.center}>
+        <TouchableOpacity style={styles.backBtnCenter} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>← Back</Text>
+        </TouchableOpacity>
         <ActivityIndicator size="large" color="#4361ee" />
         <Text style={styles.loadingText}>Generating flashcards...</Text>
       </View>
