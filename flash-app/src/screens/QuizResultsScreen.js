@@ -1,15 +1,17 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 
-import { fetchQuiz } from "../store/quizzesSlice";
+import { cloneQuiz, fetchQuiz, generateQuiz } from "../store/quizzesSlice";
 import formatError from "../utils/formatError";
+import { buildWeakAreaExtraPrompt, countQuestionTypes } from "../utils/quizFollowUp";
 
 function getCorrectAnswerText(question) {
   if (question.question_type === "free_response") {
@@ -31,10 +33,12 @@ function getUserAnswerText(question) {
   return question.user_answer || "(no answer)";
 }
 
-export default function QuizResultsScreen({ route }) {
+export default function QuizResultsScreen({ route, navigation }) {
   const { quizId } = route.params;
   const dispatch = useDispatch();
   const { quiz, loading, error } = useSelector((state) => state.quizzes);
+  const [pinnedResult, setPinnedResult] = useState(null);
+  const [followUp, setFollowUp] = useState(null);
 
   useEffect(() => {
     const hasLoadedResults =
@@ -48,7 +52,65 @@ export default function QuizResultsScreen({ route }) {
     }
   }, [dispatch, quizId, quiz]);
 
-  if (loading && (!quiz || quiz.id !== quizId)) {
+  useEffect(() => {
+    if (
+      quiz &&
+      quiz.id === quizId &&
+      quiz.completed_at &&
+      Array.isArray(quiz.questions)
+    ) {
+      setPinnedResult(quiz);
+    }
+  }, [quiz, quizId]);
+
+  const effectiveQuiz =
+    pinnedResult?.id === quizId
+      ? pinnedResult
+      : quiz?.id === quizId && quiz?.completed_at
+        ? quiz
+        : null;
+
+  const handleRetakeSame = () => {
+    setFollowUp("clone");
+    dispatch(cloneQuiz(quizId)).then((action) => {
+      setFollowUp(null);
+      if (action.meta.requestStatus === "fulfilled") {
+        navigation.replace("Quiz", { quizId: action.payload.id });
+      }
+    });
+  };
+
+  const handleWeakAreas = () => {
+    const q = effectiveQuiz;
+    if (!q) {
+      return;
+    }
+    const { mc_count, fitb_count, fr_count } = countQuestionTypes(q.questions);
+    if (mc_count + fitb_count + fr_count <= 0) {
+      return;
+    }
+    setFollowUp("weak");
+    dispatch(
+      generateQuiz({
+        documentId: q.document,
+        additionalDocumentIds: [],
+        difficulty: q.difficulty,
+        mc_count,
+        fitb_count,
+        fr_count,
+        class_name: q.class_name || "",
+        learning_objectives: q.learning_objectives || "",
+        extra_prompt: buildWeakAreaExtraPrompt(q.questions),
+      })
+    ).then((action) => {
+      setFollowUp(null);
+      if (action.meta.requestStatus === "fulfilled") {
+        navigation.replace("Quiz", { quizId: action.payload.id });
+      }
+    });
+  };
+
+  if (loading && (!effectiveQuiz || effectiveQuiz.id !== quizId)) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#4361ee" />
@@ -56,7 +118,7 @@ export default function QuizResultsScreen({ route }) {
     );
   }
 
-  if (!quiz || quiz.id !== quizId) {
+  if (!effectiveQuiz || effectiveQuiz.id !== quizId) {
     return (
       <View style={styles.center}>
         <Text style={styles.error}>{formatError(error) || "Unable to load results."}</Text>
@@ -64,15 +126,50 @@ export default function QuizResultsScreen({ route }) {
     );
   }
 
-  const questions = quiz.questions || [];
+  const questions = effectiveQuiz.questions || [];
+  const busyClone = followUp === "clone";
+  const busyWeak = followUp === "weak";
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.heading}>Quiz Results</Text>
       <Text style={styles.score}>
-        Score: {quiz.score != null ? `${quiz.score.toFixed(1)}%` : "N/A"}
+        Score: {effectiveQuiz.score != null ? `${effectiveQuiz.score.toFixed(1)}%` : "N/A"}
       </Text>
       {error ? <Text style={styles.error}>{formatError(error)}</Text> : null}
+
+      <View style={styles.actionsCard}>
+        <Text style={styles.actionsTitle}>What&apos;s next?</Text>
+        <TouchableOpacity
+          style={[styles.primaryBtn, (busyClone || busyWeak) && styles.btnDisabled]}
+          onPress={handleRetakeSame}
+          disabled={!!followUp}
+        >
+          {busyClone ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.primaryBtnText}>Retake same quiz</Text>
+          )}
+        </TouchableOpacity>
+        <Text style={styles.actionsHint}>
+          New attempt with the same questions; your previous score stays in history.
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.secondaryBtn, (busyClone || busyWeak) && styles.btnDisabled]}
+          onPress={handleWeakAreas}
+          disabled={!!followUp}
+        >
+          {busyWeak ? (
+            <ActivityIndicator color="#4361ee" />
+          ) : (
+            <Text style={styles.secondaryBtnText}>New quiz — focus on weak areas</Text>
+          )}
+        </TouchableOpacity>
+        <Text style={styles.actionsHint}>
+          Generates new questions on the same document, guided by what you missed.
+        </Text>
+      </View>
 
       {questions.map((question, index) => (
         <View
@@ -125,7 +222,45 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#4361ee",
     textAlign: "center",
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  actionsCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  actionsTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginBottom: 12,
+  },
+  primaryBtn: {
+    backgroundColor: "#4361ee",
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  secondaryBtn: {
+    backgroundColor: "#eef1ff",
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  secondaryBtnText: { color: "#4361ee", fontWeight: "700", fontSize: 16 },
+  btnDisabled: { opacity: 0.65 },
+  actionsHint: {
+    fontSize: 13,
+    color: "#6b7280",
+    lineHeight: 18,
+    marginBottom: 4,
   },
   error: {
     color: "#c0392b",

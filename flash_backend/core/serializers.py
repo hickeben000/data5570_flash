@@ -143,9 +143,10 @@ class QuizSerializer(serializers.ModelSerializer):
             "score",
             "created_at",
             "completed_at",
+            "cloned_from",
             "questions",
         ]
-        read_only_fields = ["id", "score", "created_at", "completed_at"]
+        read_only_fields = ["id", "score", "created_at", "completed_at", "cloned_from"]
 
 
 class QuizResultSerializer(serializers.ModelSerializer):
@@ -162,6 +163,7 @@ class QuizResultSerializer(serializers.ModelSerializer):
             "score",
             "created_at",
             "completed_at",
+            "cloned_from",
             "questions",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "cloned_from"]

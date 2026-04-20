@@ -2,6 +2,7 @@ import io
 
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -582,3 +583,47 @@ class QuizSubmitView(APIView):
         # Return the full result serializer so the frontend gets graded answers.
         serializer = QuizResultSerializer(quiz)
         return Response(serializer.data)
+
+
+@transaction.atomic
+def clone_quiz_for_retake(source: Quiz) -> Quiz:
+    """Copy questions and answer choices; clear attempts, grading, and completion."""
+    new_quiz = Quiz.objects.create(
+        document=source.document,
+        difficulty=source.difficulty,
+        class_name=source.class_name,
+        learning_objectives=source.learning_objectives,
+        cloned_from=source,
+    )
+    for question in source.questions.all().order_by("id"):
+        new_q = QuizQuestion.objects.create(
+            quiz=new_quiz,
+            question_type=question.question_type,
+            question_text=question.question_text,
+            user_answer=None,
+            is_correct=None,
+            explanation="",
+            feedback="",
+        )
+        for choice in question.answer_choices.all().order_by("id"):
+            AnswerChoice.objects.create(
+                question=new_q,
+                choice_text=choice.choice_text,
+                is_correct=choice.is_correct,
+            )
+    return new_quiz
+
+
+class QuizCloneView(APIView):
+    """POST: duplicate a completed quiz so the user can retake the same questions."""
+
+    def post(self, request, pk):
+        quiz = get_quiz_for_user(pk, request.user)
+        if not quiz.completed_at:
+            return Response(
+                {"error": "Finish and submit the quiz before retaking."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        new_quiz = clone_quiz_for_retake(quiz)
+        serializer = QuizSerializer(new_quiz)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

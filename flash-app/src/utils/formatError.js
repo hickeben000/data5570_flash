@@ -1,12 +1,23 @@
+function sanitizeApiMessage(text) {
+  if (typeof text !== "string") {
+    return text;
+  }
+  const t = text.trim();
+  if (t.startsWith("<!") || t.toLowerCase().includes("<html")) {
+    return "Server returned an error page (often 404). If you use a shared API, deploy the latest backend so this feature exists.";
+  }
+  return text;
+}
+
 export default function formatError(error) {
   if (!error) {
     return "";
   }
   if (typeof error === "string") {
-    return error;
+    return sanitizeApiMessage(error);
   }
   if (typeof error.error === "string") {
-    return error.error;
+    return sanitizeApiMessage(error.error);
   }
   if (Array.isArray(error)) {
     return error.join(", ");
@@ -18,7 +29,7 @@ export default function formatError(error) {
           return `${key}: ${value.join(", ")}`;
         }
         if (typeof value === "string") {
-          return `${key}: ${value}`;
+          return `${key}: ${sanitizeApiMessage(value)}`;
         }
         return `${key}: ${JSON.stringify(value)}`;
       })

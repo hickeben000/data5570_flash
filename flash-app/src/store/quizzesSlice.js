@@ -60,6 +60,18 @@ export const fetchQuiz = createAsyncThunk(
   }
 );
 
+export const cloneQuiz = createAsyncThunk(
+  "quizzes/clone",
+  async (quizId, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/quizzes/${quizId}/clone/`);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message || "Failed to clone quiz");
+    }
+  }
+);
+
 export const submitQuiz = createAsyncThunk(
   "quizzes/submit",
   async ({ quizId, answers }, { rejectWithValue, getState }) => {
@@ -133,6 +145,17 @@ const quizzesSlice = createSlice({
         state.quiz = action.payload;
       })
       .addCase(submitQuiz.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(cloneQuiz.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(cloneQuiz.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(cloneQuiz.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

@@ -2,7 +2,13 @@ import axios from "axios";
 import { API_URL } from "@env";
 import { getOpenAIApiKey } from "../utils/storage";
 
-const resolvedApiUrl = (API_URL || "http://localhost:8000").replace(/\/$/, "");
+// EXPO_PUBLIC_* is inlined by Expo Metro from .env (reliable on web + Expo Go).
+// @env (Babel) is a fallback. If both are missing, localhost only works when Django runs locally.
+const resolvedApiUrl = (
+  process.env.EXPO_PUBLIC_API_URL ||
+  API_URL ||
+  "http://localhost:8000"
+).replace(/\/$/, "");
 
 const api = axios.create({
   baseURL: `${resolvedApiUrl}/api`,

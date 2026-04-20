@@ -47,4 +47,9 @@ urlpatterns = [
         views.QuizSubmitView.as_view(),
         name="quiz-submit",
     ),
+    path(
+        "quizzes/<int:pk>/clone/",
+        views.QuizCloneView.as_view(),
+        name="quiz-clone",
+    ),
 ]

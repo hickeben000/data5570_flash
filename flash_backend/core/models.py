@@ -72,6 +72,13 @@ class Quiz(models.Model):
     document = models.ForeignKey(
         Document, on_delete=models.CASCADE, related_name="quizzes"
     )
+    cloned_from = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clones",
+    )
     difficulty = models.CharField(max_length=10, choices=DIFFICULTY_CHOICES)
     score = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -30,7 +30,15 @@ export const registerUser = createAsyncThunk(
       });
       return response.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || "Registration failed");
+      const data = err.response?.data;
+      if (data) {
+        return rejectWithValue(data);
+      }
+      return rejectWithValue(
+        err.message
+          ? `${err.message}. Check flash-app/.env API_URL / EXPO_PUBLIC_API_URL and that the backend is running.`
+          : "Registration failed"
+      );
     }
   }
 );
