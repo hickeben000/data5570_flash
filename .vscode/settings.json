@@ -1,7 +1,0 @@
-{
-  "terminal.integrated.env.linux": {
-    "OCI_CLI_PROFILE": "cursor-agent",
-    "SUPPRESS_LABEL_WARNING": "True",
-    "PATH": "${env:HOME}/ls:${env:PATH}"
-  }
-}
