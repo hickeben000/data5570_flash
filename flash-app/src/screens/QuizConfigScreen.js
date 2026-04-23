@@ -11,9 +11,16 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 
 import { generateQuiz } from "../store/quizzesSlice";
+import { colors, radius, shadows, spacing } from "../theme";
 import formatError from "../utils/formatError";
 
 const DIFFICULTIES = ["easy", "medium", "hard"];
+
+const DIFF_COLORS = {
+  easy: { bg: '#e8f8ef', border: '#27ae60', text: '#16a34a', activeBg: '#16a34a' },
+  medium: { bg: '#fef3c7', border: '#d97706', text: '#b45309', activeBg: '#d97706' },
+  hard: { bg: '#fee2e2', border: '#ef4444', text: '#dc2626', activeBg: '#ef4444' },
+};
 
 export default function QuizConfigScreen({ route, navigation }) {
   const { documentId, additionalDocumentIds = [] } = route.params;
@@ -50,92 +57,123 @@ export default function QuizConfigScreen({ route, navigation }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Configure Quiz</Text>
-      <Text style={styles.subtitle}>
-        Your OpenAI key stays on-device and is only sent with AI-backed quiz requests.
-      </Text>
-
-      <Text style={styles.label}>Difficulty</Text>
-      <View style={styles.row}>
-        {DIFFICULTIES.map((level) => (
-          <TouchableOpacity
-            key={level}
-            style={[styles.chip, difficulty === level && styles.chipActive]}
-            onPress={() => setDifficulty(level)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                difficulty === level && styles.chipTextActive,
-              ]}
-            >
-              {level.charAt(0).toUpperCase() + level.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.heading}>Configure Quiz</Text>
+        <Text style={styles.subtitle}>
+          Your OpenAI key stays on-device and is only sent with AI-backed quiz requests.
+        </Text>
       </View>
 
-      <Text style={styles.label}>Multiple Choice questions</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={mcCount}
-        onChangeText={setMcCount}
-      />
+      {/* Difficulty */}
+      <View style={styles.section}>
+        <Text style={styles.sectionEyebrow}>DIFFICULTY</Text>
+        <View style={styles.chipRow}>
+          {DIFFICULTIES.map((level) => {
+            const dc = DIFF_COLORS[level];
+            const active = difficulty === level;
+            return (
+              <TouchableOpacity
+                key={level}
+                style={[
+                  styles.diffChip,
+                  active
+                    ? { backgroundColor: dc.activeBg, borderColor: dc.activeBg }
+                    : { backgroundColor: dc.bg, borderColor: dc.border },
+                ]}
+                onPress={() => setDifficulty(level)}
+              >
+                <Text style={[styles.diffChipText, { color: active ? '#fff' : dc.text }]}>
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
-      <Text style={styles.label}>Fill in the Blank questions</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={fitbCount}
-        onChangeText={setFitbCount}
-      />
+      {/* Question counts */}
+      <View style={styles.section}>
+        <Text style={styles.sectionEyebrow}>QUESTION COUNTS</Text>
+        <View style={styles.countRow}>
+          <View style={styles.countField}>
+            <Text style={styles.label}>Multiple Choice questions</Text>
+            <TextInput
+              style={styles.countInput}
+              keyboardType="numeric"
+              value={mcCount}
+              onChangeText={setMcCount}
+            />
+          </View>
+          <View style={styles.countField}>
+            <Text style={styles.label}>Fill in the Blank questions</Text>
+            <TextInput
+              style={styles.countInput}
+              keyboardType="numeric"
+              value={fitbCount}
+              onChangeText={setFitbCount}
+            />
+          </View>
+          <View style={styles.countField}>
+            <Text style={styles.label}>Free Response questions</Text>
+            <TextInput
+              style={styles.countInput}
+              keyboardType="numeric"
+              value={frCount}
+              onChangeText={setFrCount}
+            />
+          </View>
+        </View>
+      </View>
 
-      <Text style={styles.label}>Free Response questions</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={frCount}
-        onChangeText={setFrCount}
-      />
+      {/* Context */}
+      <View style={styles.section}>
+        <Text style={styles.sectionEyebrow}>CONTEXT (OPTIONAL)</Text>
+        <Text style={styles.label}>Class name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Example: Biology 101"
+          placeholderTextColor={colors.fg3}
+          value={className}
+          onChangeText={setClassName}
+        />
 
-      <Text style={styles.label}>Class name</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Example: Biology 101"
-        value={className}
-        onChangeText={setClassName}
-      />
+        <Text style={styles.label}>Learning objectives</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          multiline
+          placeholder="What should this quiz emphasize?"
+          placeholderTextColor={colors.fg3}
+          value={learningObjectives}
+          onChangeText={setLearningObjectives}
+        />
 
-      <Text style={styles.label}>Learning objectives</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        multiline
-        placeholder="What should this quiz emphasize?"
-        value={learningObjectives}
-        onChangeText={setLearningObjectives}
-      />
+        <Text style={styles.label}>Extra Instructions</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          multiline
+          placeholder="Example: Focus on key vocabulary, skip chapter 1, and ask more conceptual questions."
+          placeholderTextColor={colors.fg3}
+          value={extraPrompt}
+          onChangeText={setExtraPrompt}
+        />
+      </View>
 
-      <Text style={styles.label}>Extra Instructions</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        multiline
-        placeholder="Example: Focus on key vocabulary, skip chapter 1, and ask more conceptual questions."
-        value={extraPrompt}
-        onChangeText={setExtraPrompt}
-      />
-
-      {error ? <Text style={styles.error}>{formatError(error)}</Text> : null}
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{formatError(error)}</Text>
+        </View>
+      ) : null}
 
       <TouchableOpacity
-        style={styles.button}
+        style={[styles.generateBtn, loading && styles.generateBtnDisabled]}
         onPress={handleGenerate}
         disabled={loading}
       >
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.buttonText}>Generate Quiz</Text>
+          <Text style={styles.generateBtnText}>Generate Quiz</Text>
         )}
       </TouchableOpacity>
     </ScrollView>
@@ -143,64 +181,123 @@ export default function QuizConfigScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f7fb" },
-  content: { padding: 24, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingBottom: 48 },
+
+  header: {
+    backgroundColor: colors.primary,
+    padding: spacing.xl,
+    paddingBottom: spacing.lg,
+  },
   heading: {
     fontSize: 26,
-    fontWeight: "800",
-    color: "#1a1a2e",
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 6,
   },
   subtitle: {
-    marginTop: 8,
-    marginBottom: 20,
-    color: "#666",
-    lineHeight: 22,
-  },
-  label: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#555",
-    marginBottom: 6,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 20,
+  },
+
+  section: {
+    backgroundColor: colors.surface,
     marginTop: 12,
+    padding: spacing.xl,
+    ...shadows.low,
   },
-  row: {
-    flexDirection: "row",
+  sectionEyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.8,
+    marginBottom: 14,
+  },
+
+  chipRow: {
+    flexDirection: 'row',
     gap: 10,
-    marginBottom: 8,
-    flexWrap: "wrap",
   },
-  chip: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    backgroundColor: "#e0e0e0",
+  diffChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    alignItems: 'center',
   },
-  chipActive: { backgroundColor: "#4361ee" },
-  chipText: { fontWeight: "600", color: "#333" },
-  chipTextActive: { color: "#fff" },
-  input: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
+  diffChipText: {
+    fontWeight: '700',
+    fontSize: 14,
+  },
+
+  countRow: {
+    gap: 12,
+  },
+  countField: {
+    flex: 1,
+  },
+  countInput: {
+    backgroundColor: colors.surfaceInset,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
     padding: 14,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#ddd",
+    color: colors.fg1,
+    fontWeight: '700',
+    textAlign: 'center',
     marginBottom: 8,
   },
+
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.fg2,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  input: {
+    backgroundColor: colors.surfaceInset,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: 14,
+    fontSize: 15,
+    color: colors.fg1,
+    marginBottom: 14,
+  },
   textArea: {
-    minHeight: 110,
-    textAlignVertical: "top",
+    minHeight: 100,
+    textAlignVertical: 'top',
   },
-  error: {
-    color: "#c0392b",
-    marginTop: 8,
+
+  errorBox: {
+    marginHorizontal: spacing.xl,
+    marginTop: 12,
+    backgroundColor: colors.errorBg,
+    borderRadius: radius.md,
+    padding: 14,
   },
-  button: {
-    backgroundColor: "#4361ee",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 20,
+  errorText: {
+    color: colors.errorDark,
+    fontSize: 14,
+    fontWeight: '600',
   },
-  buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+
+  generateBtn: {
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.xl,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: 18,
+    alignItems: 'center',
+    ...shadows.mid,
+  },
+  generateBtnDisabled: { opacity: 0.7 },
+  generateBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+  },
 });

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,12 +16,50 @@ import {
   getOpenAIApiKey,
   setOpenAIApiKey,
 } from "../utils/storage";
+import { colors, radius, shadows } from "../theme";
+
+const isWeb = Platform.OS === "web";
+
+function Toggle({ on, onToggle }) {
+  return (
+    <TouchableOpacity
+      onPress={onToggle}
+      style={[styles.toggle, on && styles.toggleOn]}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.toggleThumb, on && styles.toggleThumbOn]} />
+    </TouchableOpacity>
+  );
+}
+
+function SectionCard({ children }) {
+  return <View style={styles.prefCard}>{children}</View>;
+}
+
+function PrefRow({ label, desc, right }) {
+  return (
+    <View style={styles.prefRow}>
+      <View style={styles.prefInfo}>
+        <Text style={styles.prefLabel}>{label}</Text>
+        {desc ? <Text style={styles.prefDesc}>{desc}</Text> : null}
+      </View>
+      {right}
+    </View>
+  );
+}
 
 export default function SettingsScreen() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
   const [apiKey, setApiKeyInput] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [savedOk, setSavedOk] = useState(false);
+  const [notifications, setNotifications] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+
+  const initials = user?.username
+    ? user.username.slice(0, 2).toUpperCase()
+    : "ME";
 
   useEffect(() => {
     const loadApiKey = async () => {
@@ -32,13 +71,14 @@ export default function SettingsScreen() {
         setStatusMessage("No OpenAI key saved yet.");
       }
     };
-
     loadApiKey();
   }, []);
 
   const handleSave = async () => {
     await setOpenAIApiKey(apiKey);
+    setSavedOk(true);
     setStatusMessage("OpenAI key saved on this device.");
+    setTimeout(() => setSavedOk(false), 2000);
   };
 
   const handleClear = async () => {
@@ -48,154 +88,341 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Settings</Text>
-      <Text style={styles.subtitle}>
-        Manage your AI key and account session.
-      </Text>
-
-      {statusMessage ? (
-        <View style={styles.statusBox}>
-          <Text style={styles.statusText}>{statusMessage}</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+    >
+      {/* Profile hero */}
+      <View style={styles.profileHero}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initials}</Text>
         </View>
-      ) : null}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>OpenAI API Key</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardText}>
-            Flash stores your key locally on this device and only attaches it to AI-backed requests.
-          </Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your OpenAI API key (sk-...)"
-            value={apiKey}
-            onChangeText={setApiKeyInput}
-            autoCapitalize="none"
-            secureTextEntry
-          />
-
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>Save Key</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-            <Text style={styles.clearButtonText}>Clear Key</Text>
-          </TouchableOpacity>
+        <View style={styles.profileInfo}>
+          <Text style={styles.username}>{user?.username || "You"}</Text>
+          <Text style={styles.userSubtitle}>Flash student</Text>
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardText}>
-            {user?.username ? `Signed in as ${user.username}.` : "You are signed in."}
+      <View style={styles.sections}>
+        {/* API Key section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>OpenAI API Key</Text>
+          <Text style={styles.sectionDesc}>
+            Your key is stored on-device only and never sent to our servers.
+            Required to generate flashcards and quizzes.
           </Text>
-        </View>
-      </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={() => dispatch(logoutUser())}>
-        <Text style={styles.logoutButtonText}>Log Out</Text>
-      </TouchableOpacity>
+          {statusMessage ? (
+            <View style={styles.statusBox}>
+              <Text style={styles.statusText}>{statusMessage}</Text>
+            </View>
+          ) : null}
+
+          <SectionCard>
+            <PrefRow
+              label="API Key"
+              desc="Get your key at platform.openai.com"
+              right={null}
+            />
+            <View style={styles.apiKeyRow}>
+              <TextInput
+                style={styles.apiInput}
+                placeholder="sk-..."
+                placeholderTextColor={colors.fg3}
+                value={apiKey}
+                onChangeText={(t) => {
+                  setApiKeyInput(t);
+                  setSavedOk(false);
+                }}
+                autoCapitalize="none"
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.apiKeyActions}>
+              <TouchableOpacity
+                style={[styles.saveBtn, savedOk && styles.saveBtnOk]}
+                onPress={handleSave}
+              >
+                <Text style={styles.saveBtnText}>
+                  {savedOk ? "✓ Saved" : "Save Key"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.clearBtn} onPress={handleClear}>
+                <Text style={styles.clearBtnText}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          </SectionCard>
+        </View>
+
+        {/* Preferences */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <SectionCard>
+            <PrefRow
+              label="Study Reminders"
+              desc="Daily notifications to keep you on track"
+              right={
+                <Toggle
+                  on={notifications}
+                  onToggle={() => setNotifications((n) => !n)}
+                />
+              }
+            />
+            <View style={styles.rowDivider} />
+            <PrefRow
+              label="Dark Mode"
+              desc="Coming soon"
+              right={
+                <Toggle
+                  on={darkMode}
+                  onToggle={() => setDarkMode((d) => !d)}
+                />
+              }
+            />
+          </SectionCard>
+        </View>
+
+        {/* Account info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <SectionCard>
+            {[
+              ["Signed in as", user?.username || "Unknown"],
+              ["Version", "1.0.0"],
+              ["Backend", "Django REST API"],
+            ].map(([k, v]) => (
+              <View key={k}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoKey}>{k}</Text>
+                  <Text style={styles.infoVal}>{v}</Text>
+                </View>
+                <View style={styles.rowDivider} />
+              </View>
+            ))}
+          </SectionCard>
+        </View>
+
+        {/* Logout */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={() => dispatch(logoutUser())}
+        >
+          <Text style={styles.logoutBtnText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    backgroundColor: "#f5f7fb",
-    flexGrow: 1,
+    flex: 1,
+    backgroundColor: colors.bg,
   },
-  title: {
-    fontSize: 28,
+  content: {
+    paddingBottom: 40,
+  },
+  profileHero: {
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    padding: isWeb ? 40 : 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  avatarText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  username: {
+    fontSize: 20,
     fontWeight: "800",
-    color: "#1f2937",
-    marginBottom: 8,
+    color: colors.fg1,
   },
-  subtitle: {
-    fontSize: 15,
-    color: "#6b7280",
-    marginBottom: 24,
+  userSubtitle: {
+    fontSize: 13,
+    color: colors.fg2,
+    marginTop: 2,
   },
-  statusBox: {
-    backgroundColor: "#e0ecff",
-    borderColor: "#4361ee",
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 20,
-  },
-  statusText: {
-    color: "#1f2937",
-    fontSize: 14,
-    fontWeight: "500",
+  sections: {
+    padding: isWeb ? 40 : 20,
+    maxWidth: isWeb ? 680 : undefined,
+    gap: 28,
   },
   section: {
-    marginBottom: 24,
+    gap: 10,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#374151",
-    marginBottom: 10,
+    fontSize: 16,
+    fontWeight: "800",
+    color: colors.fg1,
   },
-  card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  cardText: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 12,
+  sectionDesc: {
+    fontSize: 13,
+    color: colors.fg2,
     lineHeight: 20,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 10,
+  statusBox: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.sm,
     padding: 12,
-    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
+  },
+  statusText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: "600",
+  },
+  prefCard: {
     backgroundColor: "#fff",
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  saveButton: {
-    backgroundColor: "#4361ee",
-    paddingVertical: 12,
-    borderRadius: 10,
+  prefRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    justifyContent: "space-between",
+    padding: 16,
+    paddingHorizontal: 20,
   },
-  saveButtonText: {
+  prefInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  prefLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.fg1,
+    marginBottom: 2,
+  },
+  prefDesc: {
+    fontSize: 12,
+    color: colors.fg3,
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: "#f1f5f9",
+    marginHorizontal: 0,
+  },
+  apiKeyRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  apiInput: {
+    backgroundColor: "#fff",
+    borderRadius: radius.md,
+    padding: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: colors.fg1,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    width: "100%",
+  },
+  apiKeyActions: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  saveBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  saveBtnOk: {
+    backgroundColor: colors.successDark,
+  },
+  saveBtnText: {
     color: "#fff",
     fontWeight: "700",
+    fontSize: 14,
   },
-  clearButton: {
-    backgroundColor: "#eef1ff",
+  clearBtn: {
+    backgroundColor: "#f1f5f9",
+    borderRadius: radius.md,
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 10,
     alignItems: "center",
   },
-  clearButtonText: {
-    color: "#4361ee",
+  clearBtnText: {
+    color: colors.fg2,
     fontWeight: "700",
+    fontSize: 14,
   },
-  logoutButton: {
-    marginTop: 10,
-    backgroundColor: "#111827",
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 14,
+    paddingHorizontal: 20,
+  },
+  infoKey: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  infoVal: {
+    fontSize: 13,
+    color: colors.fg3,
+    fontFamily: Platform.OS === "web" ? "monospace" : "Courier",
+  },
+  toggle: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.border,
+    position: "relative",
+    flexShrink: 0,
+  },
+  toggleOn: {
+    backgroundColor: colors.primary,
+  },
+  toggleThumb: {
+    position: "absolute",
+    top: 3,
+    left: 3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#fff",
+    ...shadows.low,
+  },
+  toggleThumbOn: {
+    left: 23,
+  },
+  logoutBtn: {
+    backgroundColor: "#fee2e2",
+    borderRadius: radius.lg,
     paddingVertical: 14,
-    borderRadius: 10,
+    paddingHorizontal: 24,
     alignItems: "center",
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: 8,
   },
-  logoutButtonText: {
-    color: "#fff",
-    fontSize: 16,
+  logoutBtnText: {
+    color: colors.errorDark,
     fontWeight: "700",
+    fontSize: 15,
   },
 });

@@ -1,0 +1,40 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 16px; background: #fff; font-family: 'Nunito', sans-serif; display: flex; flex-direction: column; gap: 12px; }
+  .row { display: flex; gap: 8px; align-items: stretch; }
+  .swatch { flex: 1; border-radius: 10px; min-height: 64px; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px 10px; }
+  .swatch-label { font-size: 11px; font-weight: 700; }
+  .swatch-hex { font-size: 10px; opacity: 0.8; }
+  .gradient-bar { height: 64px; border-radius: 10px; background: linear-gradient(135deg, #2B7FFF 0%, #1560F0 100%); display: flex; align-items: center; padding: 0 14px; }
+  .gradient-bar span { color: #fff; font-size: 12px; font-weight: 700; }
+  .shimmer { background: linear-gradient(135deg, #69ADFF 0%, #2B7FFF 100%); }
+</style></head><body>
+<div class="row">
+  <div class="swatch" style="background:#4361ee;">
+    <span class="swatch-label" style="color:#fff;">Primary</span>
+    <span class="swatch-hex" style="color:#fff;">#4361ee</span>
+  </div>
+  <div class="swatch" style="background:#2f4acb;">
+    <span class="swatch-label" style="color:#fff;">Primary Dark</span>
+    <span class="swatch-hex" style="color:#fff;">#2f4acb</span>
+  </div>
+  <div class="swatch" style="background:#eef1ff; border: 1px solid #d6dcff;">
+    <span class="swatch-label" style="color:#4361ee;">Primary Light</span>
+    <span class="swatch-hex" style="color:#4361ee;">#eef1ff</span>
+  </div>
+</div>
+<div class="gradient-bar">
+  <span>Brand Gradient · #2B7FFF → #1560F0</span>
+</div>
+<div class="row">
+  <div class="swatch shimmer" style="flex:1; min-height:44px;">
+    <span class="swatch-label" style="color:#fff;">Shimmer</span>
+    <span class="swatch-hex" style="color:#fff;">#69ADFF</span>
+  </div>
+  <div class="swatch" style="background:#f5f7fb; border:1px solid #dfe4f1; flex:2;">
+    <span class="swatch-label" style="color:#4361ee;">Background</span>
+    <span class="swatch-hex" style="color:#6b7280;">#f5f7fb</span>
+  </div>
+</div>
+</body></html>

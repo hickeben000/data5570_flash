@@ -1,0 +1,85 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 16px; background: #fff; font-family: 'Nunito', sans-serif; display: flex; flex-direction: column; gap: 14px; }
+  .section-title { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .radius-row { display: flex; gap: 8px; align-items: center; }
+  .radius-demo { background: #4361ee; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
+  .radius-label { font-size: 11px; color: #6b7280; font-weight: 600; }
+  .shadow-row { display: flex; gap: 10px; }
+  .shadow-demo { background: #fff; width: 70px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .shadow-label { font-size: 10px; color: #6b7280; font-weight: 600; margin-top: 4px; text-align: center; }
+  .shadow-wrap { display: flex; flex-direction: column; align-items: center; }
+  .spacing-row { display: flex; gap: 0; align-items: flex-end; }
+  .sp { background: linear-gradient(135deg, #2B7FFF, #1560F0); display: inline-block; height: 20px; border-radius: 3px; margin-right: 6px; }
+  .sp-label { font-size: 10px; color: #6b7280; }
+</style></head><body>
+<div>
+  <div class="section-title">Border Radius</div>
+  <div class="radius-row">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <div class="radius-demo" style="border-radius:8px;"></div>
+      <span class="radius-label">sm·8</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <div class="radius-demo" style="border-radius:10px;"></div>
+      <span class="radius-label">md·10</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <div class="radius-demo" style="border-radius:14px;"></div>
+      <span class="radius-label">lg·14</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <div class="radius-demo" style="border-radius:18px;"></div>
+      <span class="radius-label">xl·18</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <div class="radius-demo" style="border-radius:9999px; width:56px;"></div>
+      <span class="radius-label">full</span>
+    </div>
+  </div>
+</div>
+<div>
+  <div class="section-title">Shadows</div>
+  <div class="shadow-row">
+    <div class="shadow-wrap">
+      <div class="shadow-demo" style="box-shadow:0 1px 5px rgba(0,0,0,0.08);"></div>
+      <div class="shadow-label">low</div>
+    </div>
+    <div class="shadow-wrap">
+      <div class="shadow-demo" style="box-shadow:0 2px 8px rgba(0,0,0,0.08);"></div>
+      <div class="shadow-label">mid</div>
+    </div>
+    <div class="shadow-wrap">
+      <div class="shadow-demo" style="box-shadow:0 4px 16px rgba(0,0,0,0.12);"></div>
+      <div class="shadow-label">high</div>
+    </div>
+  </div>
+</div>
+<div>
+  <div class="section-title">Spacing Scale</div>
+  <div class="spacing-row">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div class="sp" style="width:4px;"></div><span class="sp-label">4</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div class="sp" style="width:8px;"></div><span class="sp-label">8</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div class="sp" style="width:12px;"></div><span class="sp-label">12</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div class="sp" style="width:16px;"></div><span class="sp-label">16</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div class="sp" style="width:20px;"></div><span class="sp-label">20</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div class="sp" style="width:24px;"></div><span class="sp-label">24</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+      <div class="sp" style="width:32px;"></div><span class="sp-label">32</span>
+    </div>
+  </div>
+</div>
+</body></html>
