@@ -10,7 +10,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 
 import Card from "../components/Card";
-import { fetchDocuments } from "../store/documentsSlice";
+import { deleteDocument, fetchDocuments } from "../store/documentsSlice";
 import formatError from "../utils/formatError";
 
 export default function CourseScreen({ route, navigation }) {
@@ -49,6 +49,19 @@ export default function CourseScreen({ route, navigation }) {
     setSelectedIds([]);
   };
 
+  const handleDeleteSelected = async () => {
+    if (
+      window.confirm(
+        `Delete ${selectedIds.length} document(s)?\n\nThis cannot be undone.`
+      )
+    ) {
+      for (const id of selectedIds) {
+        await dispatch(deleteDocument(id));
+      }
+      cancelSelectMode();
+    }
+  };
+
   const handleStudySelected = () => {
     navigation.navigate("DocumentAction", {
       courseId,
@@ -61,15 +74,25 @@ export default function CourseScreen({ route, navigation }) {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.heading}>{courseName}</Text>
-        {isSelecting ? (
-          <TouchableOpacity onPress={cancelSelectMode} style={styles.headerButton}>
-            <Text style={styles.headerButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={enterSelectMode} style={styles.headerButton}>
-            <Text style={styles.headerButtonText}>Select</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerActions}>
+          {isSelecting ? (
+            <TouchableOpacity onPress={cancelSelectMode} style={styles.headerButton}>
+              <Text style={styles.headerButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("QuizHistory", { courseId, courseName })}
+                style={[styles.headerButton, styles.headerButtonSecondary]}
+              >
+                <Text style={styles.headerButtonSecondaryText}>Quiz History</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={enterSelectMode} style={styles.headerButton}>
+                <Text style={styles.headerButtonText}>Select</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </View>
 
       <Text style={styles.subtitle}>
@@ -124,11 +147,22 @@ export default function CourseScreen({ route, navigation }) {
       )}
 
       {isSelecting && selectedIds.length > 0 && (
-        <TouchableOpacity style={styles.studyBar} onPress={handleStudySelected}>
-          <Text style={styles.studyBarText}>
-            Study Selected ({selectedIds.length})
-          </Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity
+            style={styles.deleteBar}
+            accessibilityLabel="Delete Selected"
+            onPress={handleDeleteSelected}
+          >
+            <Text style={styles.deleteBarText}>
+              Delete Selected ({selectedIds.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.studyBar} onPress={handleStudySelected}>
+            <Text style={styles.studyBarText}>
+              Study Selected ({selectedIds.length})
+            </Text>
+          </TouchableOpacity>
+        </>
       )}
 
       <TouchableOpacity
@@ -157,6 +191,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   heading: {
     fontSize: 28,
     fontWeight: "800",
@@ -173,6 +212,16 @@ const styles = StyleSheet.create({
     color: "#4361ee",
     fontWeight: "700",
     fontSize: 14,
+  },
+  headerButtonSecondary: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#c8d0f0",
+  },
+  headerButtonSecondaryText: {
+    color: "#4361ee",
+    fontWeight: "600",
+    fontSize: 13,
   },
   subtitle: {
     marginTop: 6,
@@ -237,6 +286,26 @@ const styles = StyleSheet.create({
   },
   cardFlex: {
     flex: 1,
+  },
+  deleteBar: {
+    position: "absolute",
+    bottom: 160,
+    left: 20,
+    right: 20,
+    backgroundColor: "#dc2626",
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  deleteBarText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
   },
   studyBar: {
     position: "absolute",

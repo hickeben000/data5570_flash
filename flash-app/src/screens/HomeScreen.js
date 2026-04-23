@@ -15,6 +15,7 @@ import formatError from "../utils/formatError";
 import {
   clearCoursesError,
   createCourse,
+  deleteCourse,
   fetchCourses,
 } from "../store/coursesSlice";
 
@@ -26,6 +27,16 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     dispatch(fetchCourses());
   }, [dispatch]);
+
+  const handleDeleteCourse = (course) => {
+    if (
+      window.confirm(
+        `Delete "${course.name}"?\n\nThis will also remove all its documents and quizzes.`
+      )
+    ) {
+      dispatch(deleteCourse(course.id));
+    }
+  };
 
   const handleCreateCourse = () => {
     const trimmedName = courseName.trim();
@@ -77,16 +88,27 @@ export default function HomeScreen({ navigation }) {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={courses.length === 0 && styles.emptyList}
           renderItem={({ item }) => (
-            <Card
-              title={item.name}
-              content={`Created ${new Date(item.created_at).toLocaleDateString()}`}
-              onPress={() =>
-                navigation.navigate("Course", {
-                  courseId: item.id,
-                  courseName: item.name,
-                })
-              }
-            />
+            <View style={styles.courseRow}>
+              <View style={styles.courseCardFlex}>
+                <Card
+                  title={item.name}
+                  content={`Created ${new Date(item.created_at).toLocaleDateString()}`}
+                  onPress={() =>
+                    navigation.navigate("Course", {
+                      courseId: item.id,
+                      courseName: item.name,
+                    })
+                  }
+                />
+              </View>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                accessibilityLabel={`Delete ${item.name}`}
+                onPress={() => handleDeleteCourse(item)}
+              >
+                <Text style={styles.deleteButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
           )}
           ListEmptyComponent={
             <Text style={styles.empty}>
@@ -170,5 +192,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  courseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  courseCardFlex: {
+    flex: 1,
+  },
+  deleteButton: {
+    marginRight: 16,
+    marginLeft: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#fee2e2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteButtonText: {
+    color: "#dc2626",
+    fontWeight: "700",
+    fontSize: 14,
   },
 });
