@@ -1,0 +1,44 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 16px; background: #f5f7fb; font-family: 'Nunito', sans-serif; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+  .btn { font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 700; border: none; border-radius: 12px; padding: 13px 22px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .btn-primary { background: #4361ee; color: #fff; }
+  .btn-secondary { background: #e5e7eb; color: #374151; }
+  .btn-ghost { background: transparent; color: #4361ee; }
+  .btn-success { background: #27ae60; color: #fff; }
+  .btn-warning { background: #d97706; color: #fff; }
+  .btn-disabled { background: #4361ee; color: #fff; opacity: 0.5; cursor: not-allowed; }
+  .btn-sm { font-size: 13px; padding: 9px 16px; border-radius: 10px; }
+  .label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 5px; }
+  .group { display: flex; flex-direction: column; gap: 6px; }
+</style></head><body>
+<div class="group">
+  <span class="label">Primary</span>
+  <button class="btn btn-primary">Add Course</button>
+</div>
+<div class="group">
+  <span class="label">Secondary</span>
+  <button class="btn btn-secondary">Previous</button>
+</div>
+<div class="group">
+  <span class="label">Ghost / Link</span>
+  <button class="btn btn-ghost">← Back</button>
+</div>
+<div class="group">
+  <span class="label">Success</span>
+  <button class="btn btn-success">Known ✓</button>
+</div>
+<div class="group">
+  <span class="label">Warning</span>
+  <button class="btn btn-warning">Review ↩</button>
+</div>
+<div class="group">
+  <span class="label">Disabled</span>
+  <button class="btn btn-disabled" disabled>Submit Quiz</button>
+</div>
+<div class="group">
+  <span class="label">Small</span>
+  <button class="btn btn-primary btn-sm">Generate</button>
+</div>
+</body></html>

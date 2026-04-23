@@ -2,16 +2,48 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useDispatch, useSelector } from "react-redux";
 
-import Card from "../components/Card";
 import { deleteDocument, fetchDocuments } from "../store/documentsSlice";
 import formatError from "../utils/formatError";
+import { colors, radius, shadows } from "../theme";
+
+const isWeb = Platform.OS === "web";
+
+function DocRow({ item, isSelected, isSelecting, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[styles.docRow, isSelected && styles.docRowSelected]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      {isSelecting && (
+        <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
+          {isSelected && <Text style={styles.checkMark}>✓</Text>}
+        </View>
+      )}
+      <View style={styles.docIcon}>
+        <Text style={styles.docIconText}>📄</Text>
+      </View>
+      <View style={styles.docInfo}>
+        <Text style={styles.docTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.docMeta}>
+          {item.source_type} · {new Date(item.uploaded_at).toLocaleDateString()}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function CourseScreen({ route, navigation }) {
   const { courseId, courseName } = route.params;
@@ -35,7 +67,9 @@ export default function CourseScreen({ route, navigation }) {
       return;
     }
     setSelectedIds((prev) =>
-      prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
+      prev.includes(item.id)
+        ? prev.filter((id) => id !== item.id)
+        : [...prev, item.id]
     );
   };
 
@@ -70,44 +104,23 @@ export default function CourseScreen({ route, navigation }) {
     cancelSelectMode();
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.heading}>{courseName}</Text>
-        <View style={styles.headerActions}>
-          {isSelecting ? (
-            <TouchableOpacity onPress={cancelSelectMode} style={styles.headerButton}>
-              <Text style={styles.headerButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TouchableOpacity
-                onPress={() => navigation.navigate("QuizHistory", { courseId, courseName })}
-                style={[styles.headerButton, styles.headerButtonSecondary]}
-              >
-                <Text style={styles.headerButtonSecondaryText}>Quiz History</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={enterSelectMode} style={styles.headerButton}>
-                <Text style={styles.headerButtonText}>Select</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
+  const subtitle = isSelecting
+    ? selectedIds.length === 0
+      ? "Tap documents to select them."
+      : `${selectedIds.length} selected`
+    : "Tap a document to study it, or use Select to combine multiple.";
 
-      <Text style={styles.subtitle}>
-        {isSelecting
-          ? selectedIds.length === 0
-            ? "Tap documents to select them."
-            : `${selectedIds.length} selected`
-          : "Tap a document to study it, or use Select to combine multiple."}
-      </Text>
+  const content = (
+    <>
+      <Text style={styles.subtitle}>{subtitle}</Text>
 
-      {error ? <Text style={styles.error}>{formatError(error)}</Text> : null}
+      {error ? (
+        <Text style={styles.error}>{formatError(error)}</Text>
+      ) : null}
 
       {loading && documents.length === 0 ? (
         <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color="#4361ee" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -117,27 +130,14 @@ export default function CourseScreen({ route, navigation }) {
             documents.length === 0 && styles.emptyList,
             styles.list,
           ]}
-          renderItem={({ item }) => {
-            const isSelected = selectedIds.includes(item.id);
-            return (
-              <View style={[styles.cardWrapper, isSelected && styles.cardWrapperSelected]}>
-                {isSelecting && (
-                  <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
-                    {isSelected && <Text style={styles.checkMark}>✓</Text>}
-                  </View>
-                )}
-                <View style={styles.cardFlex}>
-                  <Card
-                    title={item.title}
-                    content={`Source: ${item.source_type} • ${new Date(
-                      item.uploaded_at
-                    ).toLocaleDateString()}`}
-                    onPress={() => handleCardPress(item)}
-                  />
-                </View>
-              </View>
-            );
-          }}
+          renderItem={({ item }) => (
+            <DocRow
+              item={item}
+              isSelected={selectedIds.includes(item.id)}
+              isSelecting={isSelecting}
+              onPress={() => handleCardPress(item)}
+            />
+          )}
           ListEmptyComponent={
             <Text style={styles.empty}>
               No documents yet. Add one to start generating study content.
@@ -145,7 +145,62 @@ export default function CourseScreen({ route, navigation }) {
           }
         />
       )}
+    </>
+  );
 
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <LinearGradient
+        colors={["#1a56db", "#1560F0", "#2B7FFF"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerTopRow}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {courseName}
+          </Text>
+          <View style={styles.headerActions}>
+            {isSelecting ? (
+              <TouchableOpacity
+                style={styles.headerBtn}
+                onPress={cancelSelectMode}
+              >
+                <Text style={styles.headerBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.headerBtn, styles.headerBtnOutline]}
+                  onPress={() =>
+                    navigation.navigate("QuizHistory", { courseId, courseName })
+                  }
+                >
+                  <Text style={styles.headerBtnTextOutline}>Quiz History</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.headerBtn}
+                  onPress={enterSelectMode}
+                >
+                  <Text style={styles.headerBtnText}>Select</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Body */}
+      {isWeb ? (
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+          {content}
+        </ScrollView>
+      ) : (
+        <View style={styles.body}>{content}</View>
+      )}
+
+      {/* Selection action bars */}
       {isSelecting && selectedIds.length > 0 && (
         <>
           <TouchableOpacity
@@ -157,7 +212,10 @@ export default function CourseScreen({ route, navigation }) {
               Delete Selected ({selectedIds.length})
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.studyBar} onPress={handleStudySelected}>
+          <TouchableOpacity
+            style={styles.studyBar}
+            onPress={handleStudySelected}
+          >
             <Text style={styles.studyBarText}>
               Study Selected ({selectedIds.length})
             </Text>
@@ -165,14 +223,10 @@ export default function CourseScreen({ route, navigation }) {
         </>
       )}
 
+      {/* FAB */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() =>
-          navigation.navigate("Upload", {
-            courseId,
-            courseName,
-          })
-        }
+        onPress={() => navigation.navigate("Upload", { courseId, courseName })}
       >
         <Text style={styles.fabText}>Add</Text>
       </TouchableOpacity>
@@ -183,58 +237,71 @@ export default function CourseScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f7fb",
-    padding: 20,
+    backgroundColor: colors.bg,
   },
-  headerRow: {
+  header: {
+    paddingHorizontal: isWeb ? 40 : 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+  headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: isWeb ? 28 : 22,
+    fontWeight: "900",
+    color: "#fff",
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  heading: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#1a1a2e",
-    flexShrink: 1,
-  },
-  headerButton: {
+  headerBtn: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#eef1ff",
   },
-  headerButtonText: {
-    color: "#4361ee",
+  headerBtnText: {
+    color: "#fff",
     fontWeight: "700",
-    fontSize: 14,
+    fontSize: 13,
   },
-  headerButtonSecondary: {
+  headerBtnOutline: {
     backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "#c8d0f0",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.5)",
   },
-  headerButtonSecondaryText: {
-    color: "#4361ee",
+  headerBtnTextOutline: {
+    color: "#fff",
     fontWeight: "600",
     fontSize: 13,
   },
+  body: {
+    flex: 1,
+    paddingHorizontal: isWeb ? 40 : 20,
+    paddingTop: 20,
+  },
+  bodyContent: {
+    paddingBottom: 100,
+  },
   subtitle: {
-    marginTop: 6,
-    marginBottom: 14,
-    color: "#666",
-    fontSize: 15,
+    marginBottom: 16,
+    color: colors.fg2,
+    fontSize: 14,
   },
   error: {
-    color: "#c0392b",
+    color: colors.errorDark,
     marginBottom: 8,
+    fontSize: 14,
   },
   list: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   emptyList: {
     flexGrow: 1,
@@ -242,26 +309,31 @@ const styles = StyleSheet.create({
   },
   empty: {
     textAlign: "center",
-    color: "#7b8191",
+    color: colors.fg2,
     fontSize: 15,
+    paddingTop: 40,
   },
   loadingState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingTop: 60,
   },
-  cardWrapper: {
+  docRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
+    backgroundColor: "#fff",
+    borderRadius: radius.lg,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 2,
     borderColor: "transparent",
-    marginBottom: 2,
+    gap: 12,
+    ...shadows.low,
   },
-  cardWrapperSelected: {
-    borderColor: "#4361ee",
-    backgroundColor: "#eef1ff",
-    borderRadius: 14,
+  docRowSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   checkCircle: {
     width: 24,
@@ -270,37 +342,55 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#c0c8e0",
     backgroundColor: "#fff",
-    marginLeft: 4,
-    marginRight: 4,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
   checkCircleSelected: {
-    backgroundColor: "#4361ee",
-    borderColor: "#4361ee",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   checkMark: {
     color: "#fff",
     fontSize: 13,
     fontWeight: "700",
   },
-  cardFlex: {
+  docIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  docIconText: {
+    fontSize: 18,
+  },
+  docInfo: {
     flex: 1,
+    minWidth: 0,
+  },
+  docTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.fg1,
+    marginBottom: 3,
+  },
+  docMeta: {
+    fontSize: 12,
+    color: colors.fg3,
   },
   deleteBar: {
     position: "absolute",
-    bottom: 160,
+    bottom: 164,
     left: 20,
     right: 20,
-    backgroundColor: "#dc2626",
-    borderRadius: 14,
+    backgroundColor: colors.errorDark,
+    borderRadius: radius.lg,
     paddingVertical: 16,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    ...shadows.high,
   },
   deleteBarText: {
     color: "#fff",
@@ -309,18 +399,14 @@ const styles = StyleSheet.create({
   },
   studyBar: {
     position: "absolute",
-    bottom: 90,
+    bottom: 94,
     left: 20,
     right: 20,
-    backgroundColor: "#4361ee",
-    borderRadius: 14,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
     paddingVertical: 16,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    ...shadows.high,
   },
   studyBarText: {
     color: "#fff",
@@ -331,18 +417,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 20,
     bottom: 24,
-    backgroundColor: "#4361ee",
-    borderRadius: 999,
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
     paddingHorizontal: 22,
     paddingVertical: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    ...shadows.high,
   },
   fabText: {
     color: "#fff",
     fontWeight: "700",
+    fontSize: 15,
   },
 });

@@ -1,14 +1,18 @@
 import React, { useEffect } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
+const flashLogo = require('../../assets/flash-logo.png');
 import { NavigationContainer } from "@react-navigation/native";
-import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from "@react-navigation/drawer";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createDrawerNavigator, DrawerContentScrollView } from "@react-navigation/drawer";
+import { createStackNavigator } from "@react-navigation/stack";
 import { useDispatch, useSelector } from "react-redux";
 
 import LoginScreen from "../screens/LoginScreen";
@@ -24,135 +28,178 @@ import QuizScreen from "../screens/QuizScreen";
 import QuizResultsScreen from "../screens/QuizResultsScreen";
 import QuizHistoryScreen from "../screens/QuizHistoryScreen";
 import { logoutUser, restoreSession } from "../store/authSlice";
+import { colors, radius } from "../theme";
 
 const Drawer = createDrawerNavigator();
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 
+const isWeb = Platform.OS === 'web';
+
+// ── Loading screen ───────────────────────────────────────────────
 function AppLoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#4361ee" />
+      <ActivityIndicator size="large" color={colors.primary} />
       <Text style={styles.loadingText}>Loading your workspace...</Text>
     </View>
   );
 }
 
-function CustomDrawerContent(props) {
+// ── Main app stack ───────────────────────────────────────────────
+function HomeStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.primary },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+        cardStyle: { backgroundColor: colors.bg },
+      }}
+    >
+      <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="Course"
+        component={CourseScreen}
+        options={({ route }) => ({ title: route.params?.courseName || 'Course' })}
+      />
+      <Stack.Screen name="Upload" component={UploadScreen} options={{ title: 'Add Document' }} />
+      <Stack.Screen name="DocumentAction" component={DocumentActionScreen} options={{ title: 'Study Options' }} />
+      <Stack.Screen name="Flashcards" component={FlashcardScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="QuizConfig" component={QuizConfigScreen} options={{ title: 'Quiz Setup' }} />
+      <Stack.Screen name="Quiz" component={QuizScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="QuizResults" component={QuizResultsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="QuizHistory" component={QuizHistoryScreen} options={{ title: 'Quiz History' }} />
+    </Stack.Navigator>
+  );
+}
+
+// ── Sidebar content (web + mobile drawer) ───────────────────────
+function SidebarContent(props) {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
+  const initials = user?.username ? user.username.slice(0, 2).toUpperCase() : 'ME';
+  const activeRoute = props.state?.routes?.[props.state.index]?.name;
+
+  const navItems = [
+    { name: 'HomeStack', label: 'Courses', emoji: '📚' },
+    { name: 'Settings', label: 'Settings', emoji: '⚙️' },
+  ];
 
   return (
-    <DrawerContentScrollView {...props}>
-      <View style={styles.drawerHeader}>
-        <Text style={styles.drawerTitle}>Flash</Text>
-        <Text style={styles.drawerSubtitle}>
-          {user?.username ? `Signed in as ${user.username}` : "Study smarter"}
-        </Text>
+    <DrawerContentScrollView
+      {...props}
+      contentContainerStyle={styles.sidebarContainer}
+      scrollEnabled={false}
+    >
+      <View style={styles.sidebarLogoArea}>
+        <Image source={flashLogo} style={styles.sidebarLogoImg} resizeMode="contain" />
       </View>
 
-      <DrawerItem label="Home" onPress={() => props.navigation.navigate("Home")} />
-      <DrawerItem
-        label="Settings"
-        onPress={() => props.navigation.navigate("Settings")}
-      />
-      <DrawerItem label="Log Out" onPress={() => dispatch(logoutUser())} />
+      <View style={styles.sidebarNav}>
+        {navItems.map((item) => {
+          const isActive = activeRoute === item.name;
+          return (
+            <TouchableOpacity
+              key={item.name}
+              style={[styles.sidebarNavItem, isActive && styles.sidebarNavItemActive]}
+              onPress={() => props.navigation.navigate(item.name)}
+            >
+              <Text style={styles.sidebarNavEmoji}>{item.emoji}</Text>
+              <Text style={[styles.sidebarNavLabel, isActive && styles.sidebarNavLabelActive]}>
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View style={styles.sidebarBottom}>
+        <View style={styles.sidebarUserRow}>
+          <View style={styles.sidebarAvatar}>
+            <Text style={styles.sidebarAvatarText}>{initials}</Text>
+          </View>
+          <View style={styles.sidebarUserInfo}>
+            <Text style={styles.sidebarUsername} numberOfLines={1}>
+              {user?.username || 'You'}
+            </Text>
+            <Text style={styles.sidebarUserSub}>Flash student</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.sidebarLogoutBtn} onPress={() => dispatch(logoutUser())}>
+          <Text style={styles.sidebarLogoutText}>Sign out</Text>
+        </TouchableOpacity>
+      </View>
     </DrawerContentScrollView>
   );
 }
 
-function DrawerNavigator() {
+// ── Web: permanent sidebar ───────────────────────────────────────
+function WebAuthenticatedNavigator() {
   return (
     <Drawer.Navigator
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={({ navigation }) => ({
-        headerStyle: { backgroundColor: "#4361ee" },
-        headerTintColor: "#fff",
-        headerTitleStyle: { fontWeight: "700" },
-        headerLeft: () => (
-          <TouchableOpacity
-            onPress={() => navigation.toggleDrawer()}
-            style={styles.menuButton}
-          >
-            <Text style={styles.menuButtonText}>Menu</Text>
-          </TouchableOpacity>
-        ),
-      })}
+      drawerContent={(props) => <SidebarContent {...props} />}
+      screenOptions={{
+        drawerType: 'permanent',
+        drawerStyle: {
+          width: 220,
+          backgroundColor: '#fff',
+          borderRightWidth: 1,
+          borderRightColor: colors.border,
+        },
+        headerShown: false,
+        sceneContainerStyle: { backgroundColor: colors.bg },
+        overlayColor: 'transparent',
+      }}
     >
-      <Drawer.Screen name="Home" component={HomeScreen} />
+      <Drawer.Screen name="HomeStack" component={HomeStack} />
       <Drawer.Screen name="Settings" component={SettingsScreen} />
     </Drawer.Navigator>
   );
 }
 
-function AuthenticatedNavigator() {
+// ── Mobile: slide drawer (swipe from left) ───────────────────────
+function MobileAuthenticatedNavigator() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen
-        name="MainDrawer"
-        component={DrawerNavigator}
-        options={{ headerShown: false }}
+    <Drawer.Navigator
+      drawerContent={(props) => <SidebarContent {...props} />}
+      screenOptions={{
+        drawerType: 'slide',
+        drawerStyle: {
+          width: 260,
+          backgroundColor: '#fff',
+        },
+        headerShown: true,
+        headerStyle: { backgroundColor: colors.primary },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: '700', fontSize: 17 },
+        sceneContainerStyle: { backgroundColor: colors.bg },
+      }}
+    >
+      <Drawer.Screen
+        name="HomeStack"
+        component={HomeStack}
+        options={{ title: 'Flash', headerShown: false }}
       />
-      <Stack.Screen
-        name="Course"
-        component={CourseScreen}
-        options={({ route }) => ({ title: route.params?.courseName || "Course" })}
+      <Drawer.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ title: 'Settings' }}
       />
-      <Stack.Screen
-        name="Upload"
-        component={UploadScreen}
-        options={{ title: "Add Document" }}
-      />
-      <Stack.Screen
-        name="DocumentAction"
-        component={DocumentActionScreen}
-        options={{ title: "Study Options" }}
-      />
-      <Stack.Screen
-        name="Flashcards"
-        component={FlashcardScreen}
-        options={{ title: "Flashcards" }}
-      />
-      <Stack.Screen
-        name="QuizConfig"
-        component={QuizConfigScreen}
-        options={{ title: "Quiz Setup" }}
-      />
-      <Stack.Screen
-        name="Quiz"
-        component={QuizScreen}
-        options={{ title: "Quiz" }}
-      />
-      <Stack.Screen
-        name="QuizResults"
-        component={QuizResultsScreen}
-        options={{ title: "Results" }}
-      />
-      <Stack.Screen
-        name="QuizHistory"
-        component={QuizHistoryScreen}
-        options={{ title: "Quiz History" }}
-      />
-    </Stack.Navigator>
+    </Drawer.Navigator>
   );
 }
 
+// ── Unauthenticated ──────────────────────────────────────────────
 function UnauthenticatedNavigator() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Register"
-        component={RegisterScreen}
-        options={{ headerShown: false }}
-      />
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.bg } }}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
     </Stack.Navigator>
   );
 }
 
+// ── Root ─────────────────────────────────────────────────────────
 export default function AppNavigator() {
   const dispatch = useDispatch();
   const { token, bootstrapping } = useSelector((state) => state.auth);
@@ -161,12 +208,14 @@ export default function AppNavigator() {
     dispatch(restoreSession());
   }, [dispatch]);
 
+  const AuthNavigator = isWeb ? WebAuthenticatedNavigator : MobileAuthenticatedNavigator;
+
   return (
     <NavigationContainer>
       {bootstrapping ? (
         <AppLoadingScreen />
       ) : token ? (
-        <AuthenticatedNavigator />
+        <AuthNavigator />
       ) : (
         <UnauthenticatedNavigator />
       )}
@@ -177,40 +226,103 @@ export default function AppNavigator() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f5f7fb",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
     padding: 24,
   },
   loadingText: {
     marginTop: 12,
-    color: "#555",
+    color: colors.fg2,
     fontSize: 15,
   },
-  drawerHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 18,
+  sidebarContainer: {
+    flex: 1,
+    flexDirection: 'column',
   },
-  drawerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#1a1a2e",
+  sidebarLogoArea: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
-  drawerSubtitle: {
-    marginTop: 4,
-    fontSize: 14,
-    color: "#666",
+  sidebarLogoImg: {
+    height: 36,
+    width: 120,
   },
-  menuButton: {
-    marginLeft: 12,
+  sidebarNav: {
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    gap: 2,
+  },
+  sidebarNavItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: radius.md,
   },
-  menuButtonText: {
-    color: "#fff",
-    fontWeight: "700",
+  sidebarNavItemActive: {
+    backgroundColor: colors.primaryLight,
+  },
+  sidebarNavEmoji: {
+    fontSize: 16,
+  },
+  sidebarNavLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.fg2,
+  },
+  sidebarNavLabelActive: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  sidebarBottom: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  sidebarUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  sidebarAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sidebarAvatarText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  sidebarUserInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sidebarUsername: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.fg1,
+  },
+  sidebarUserSub: {
+    fontSize: 11,
+    color: colors.fg3,
+    marginTop: 1,
+  },
+  sidebarLogoutBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  sidebarLogoutText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.fg3,
   },
 });

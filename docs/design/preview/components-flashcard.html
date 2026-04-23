@@ -1,0 +1,41 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 16px; background: #f5f7fb; font-family: 'Nunito', sans-serif; display: flex; flex-direction: column; gap: 12px; }
+  .flashcard {
+    background: #fff;
+    border-radius: 18px;
+    padding: 28px 24px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    position: relative;
+  }
+  .card-label { font-size: 12px; font-weight: 700; color: #4361ee; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .card-text { font-size: 20px; font-weight: 700; color: #1a1a2e; text-align: center; line-height: 1.4; }
+  .tap-hint { position: absolute; bottom: 14px; font-size: 12px; color: #9ca3af; }
+  .nav-row { display: flex; gap: 10px; }
+  .nav-btn { flex: 1; background: #e5e7eb; border: none; border-radius: 12px; padding: 12px; font-family: 'Nunito', sans-serif; font-weight: 700; color: #374151; font-size: 14px; cursor: pointer; }
+  .action-row { display: flex; gap: 10px; }
+  .known-btn { flex: 1; background: #27ae60; border: none; border-radius: 12px; padding: 13px; font-family: 'Nunito', sans-serif; font-weight: 700; color: #fff; font-size: 15px; cursor: pointer; }
+  .review-btn { flex: 1; background: #d97706; border: none; border-radius: 12px; padding: 13px; font-family: 'Nunito', sans-serif; font-weight: 700; color: #fff; font-size: 15px; cursor: pointer; }
+  .counter { font-size: 13px; font-weight: 600; color: #6b7280; text-align: right; margin-bottom: 6px; }
+</style></head><body>
+<div class="counter">3 / 10</div>
+<div class="flashcard">
+  <div class="card-label">Question</div>
+  <div class="card-text">What is the powerhouse of the cell?</div>
+  <div class="tap-hint">Tap to flip</div>
+</div>
+<div class="nav-row">
+  <button class="nav-btn">Previous</button>
+  <button class="nav-btn">Next</button>
+</div>
+<div class="action-row">
+  <button class="known-btn">Known ✓</button>
+  <button class="review-btn">Review ↩</button>
+</div>
+</body></html>

@@ -10,25 +10,26 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 
 import { fetchCourseQuizHistory, retakeQuiz } from "../store/quizzesSlice";
+import { colors, radius, shadows, spacing } from "../theme";
 import formatError from "../utils/formatError";
 
 function ScoreBadge({ score }) {
   if (score == null) {
     return (
       <View style={[styles.badge, styles.badgeIncomplete]}>
-        <Text style={styles.badgeText}>In progress</Text>
+        <Text style={[styles.badgeText, { color: colors.fg3 }]}>In progress</Text>
       </View>
     );
   }
-  const color = score >= 80 ? "#2ecc71" : score >= 60 ? "#f39c12" : "#e74c3c";
+  const color = score >= 80 ? '#16a34a' : score >= 60 ? '#d97706' : '#dc2626';
+  const bgColor = score >= 80 ? '#e8f8ef' : score >= 60 ? '#fef3c7' : '#fee2e2';
   return (
-    <View style={[styles.badge, { backgroundColor: color + "22", borderColor: color }]}>
+    <View style={[styles.badge, { backgroundColor: bgColor, borderColor: color }]}>
       <Text style={[styles.badgeText, { color }]}>{score.toFixed(1)}%</Text>
     </View>
   );
 }
 
-// Compute which group_ids have more than one attempt so we know when to show version labels.
 function buildGroupedHistory(history) {
   const groupCounts = {};
   history.forEach((quiz) => {
@@ -44,6 +45,12 @@ function buildGroupedHistory(history) {
         : quiz.document_title,
   }));
 }
+
+const DIFF_COLORS = {
+  easy: '#16a34a',
+  medium: '#d97706',
+  hard: '#dc2626',
+};
 
 export default function QuizHistoryScreen({ route, navigation }) {
   const { courseId, courseName } = route.params;
@@ -73,62 +80,75 @@ export default function QuizHistoryScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Quiz History</Text>
-      <Text style={styles.subtitle}>{courseName}</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.heading}>Quiz History</Text>
+        <Text style={styles.headerSub}>{courseName}</Text>
+      </View>
 
       {historyError ? (
-        <Text style={styles.error}>{formatError(historyError)}</Text>
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{formatError(historyError)}</Text>
+        </View>
       ) : null}
 
       {historyLoading && (!history || history.length === 0) ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#4361ee" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
           data={processedHistory}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={[
-            !history || history.length === 0 ? styles.emptyList : null,
+            (!history || history.length === 0) ? styles.emptyList : null,
             styles.list,
           ]}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => handlePress(item)}
-              disabled={!item.completed_at}
-            >
-              <View style={styles.cardRow}>
-                <View style={styles.cardMain}>
-                  <Text style={styles.docTitle} numberOfLines={2}>
-                    {item.displayTitle}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1)}
-                    {" · "}
-                    {new Date(item.created_at).toLocaleDateString()}
-                  </Text>
+          renderItem={({ item }) => {
+            const diffColor = DIFF_COLORS[item.difficulty] || colors.fg2;
+            return (
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => handlePress(item)}
+                disabled={!item.completed_at}
+              >
+                <View style={styles.cardTop}>
+                  <View style={styles.cardMain}>
+                    <Text style={styles.docTitle} numberOfLines={2}>
+                      {item.displayTitle}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      <View style={[styles.diffPill, { backgroundColor: diffColor + '22', borderColor: diffColor }]}>
+                        <Text style={[styles.diffPillText, { color: diffColor }]}>
+                          {item.difficulty.charAt(0).toUpperCase() + item.difficulty.slice(1)}
+                        </Text>
+                      </View>
+                      <Text style={styles.metaDate}>
+                        {new Date(item.created_at).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </View>
+                  <ScoreBadge score={item.score} />
                 </View>
-                <ScoreBadge score={item.score} />
-              </View>
 
-              <View style={styles.cardFooter}>
-                {item.completed_at ? (
-                  <Text style={styles.tapHint}>Tap to review →</Text>
-                ) : (
-                  <View />
-                )}
-                <TouchableOpacity
-                  style={[styles.retakeBtn, loading && styles.retakeBtnDisabled]}
-                  accessibilityLabel={`Retake ${item.displayTitle}`}
-                  onPress={() => handleRetake(item)}
-                  disabled={loading}
-                >
-                  <Text style={styles.retakeBtnText}>Retake</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          )}
+                <View style={styles.cardFooter}>
+                  {item.completed_at ? (
+                    <Text style={styles.tapHint}>Tap to review →</Text>
+                  ) : (
+                    <View />
+                  )}
+                  <TouchableOpacity
+                    style={[styles.retakeBtn, loading && styles.retakeBtnDisabled]}
+                    accessibilityLabel={`Retake ${item.displayTitle}`}
+                    onPress={() => handleRetake(item)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.retakeBtnText}>Retake</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
           ListEmptyComponent={
             <Text style={styles.empty}>
               No quizzes yet. Generate a quiz from any document to get started.
@@ -141,114 +161,131 @@ export default function QuizHistoryScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f7fb",
-    padding: 20,
+  container: { flex: 1, backgroundColor: colors.bg },
+
+  header: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   heading: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#1a1a2e",
-  },
-  subtitle: {
-    marginTop: 4,
-    marginBottom: 16,
-    color: "#666",
-    fontSize: 15,
-  },
-  error: {
-    color: "#c0392b",
-    marginBottom: 8,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  list: {
-    paddingBottom: 40,
-  },
-  emptyList: {
-    flexGrow: 1,
-    justifyContent: "center",
-  },
-  empty: {
-    textAlign: "center",
-    color: "#7b8191",
-    fontSize: 15,
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  cardRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-  },
-  cardMain: {
-    flex: 1,
-    marginRight: 12,
-  },
-  docTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1a1a2e",
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
     marginBottom: 4,
   },
-  meta: {
-    fontSize: 13,
-    color: "#6b7280",
+  headerSub: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
   },
-  badge: {
-    borderRadius: 8,
+
+  errorBox: {
+    margin: spacing.lg,
+    backgroundColor: colors.errorBg,
+    borderRadius: radius.md,
+    padding: 14,
+  },
+  errorText: {
+    color: colors.errorDark,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  list: { padding: spacing.lg, paddingBottom: 40 },
+  emptyList: { flexGrow: 1, justifyContent: 'center' },
+  empty: {
+    textAlign: 'center',
+    color: colors.fg3,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.base,
+    marginBottom: 12,
+    ...shadows.low,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  cardMain: { flex: 1, marginRight: 12 },
+  docTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.fg1,
+    marginBottom: 8,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  diffPill: {
+    borderRadius: radius.full,
     borderWidth: 1,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: "flex-start",
+    paddingVertical: 3,
+  },
+  diffPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  metaDate: {
+    fontSize: 12,
+    color: colors.fg3,
+  },
+
+  badge: {
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    alignSelf: 'flex-start',
+    minWidth: 64,
+    alignItems: 'center',
   },
   badgeIncomplete: {
-    backgroundColor: "#f0f0f0",
-    borderColor: "#ccc",
+    backgroundColor: colors.surfaceInset,
+    borderColor: colors.border,
   },
   badgeText: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#555",
+    fontWeight: '700',
   },
+
   cardFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 10,
   },
   tapHint: {
     fontSize: 12,
-    color: "#4361ee",
-    fontWeight: "600",
+    color: colors.primary,
+    fontWeight: '600',
   },
   retakeBtn: {
-    backgroundColor: "#eef1ff",
-    borderRadius: 8,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.sm,
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderWidth: 1,
-    borderColor: "#c8d0f0",
+    borderColor: colors.primary,
   },
-  retakeBtnDisabled: {
-    opacity: 0.5,
-  },
+  retakeBtnDisabled: { opacity: 0.5 },
   retakeBtnText: {
-    color: "#4361ee",
-    fontWeight: "700",
+    color: colors.primary,
+    fontWeight: '700',
     fontSize: 13,
   },
 });
