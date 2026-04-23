@@ -18,7 +18,13 @@ urlpatterns = [
         views.DocumentListCreateView.as_view(),
         name="course-documents",
     ),
+    path(
+        "courses/<int:course_id>/quizzes/",
+        views.CourseQuizHistoryView.as_view(),
+        name="course-quizzes",
+    ),
     path("documents/", views.DocumentCreateView.as_view(), name="document-create"),
+    path("documents/<int:pk>/", views.DocumentDetailView.as_view(), name="document-detail"),
 
     path(
         "documents/<int:document_id>/flashcards/",
@@ -46,5 +52,10 @@ urlpatterns = [
         "quizzes/<int:pk>/submit/",
         views.QuizSubmitView.as_view(),
         name="quiz-submit",
+    ),
+    path(
+        "quizzes/<int:pk>/retake/",
+        views.QuizRetakeView.as_view(),
+        name="quiz-retake",
     ),
 ]

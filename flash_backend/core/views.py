@@ -1,4 +1,5 @@
 import io
+import uuid
 
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -33,6 +34,7 @@ from .serializers import (
     DocumentSerializer,
     FlashcardDeckSerializer,
     FlashcardSerializer,
+    QuizHistorySerializer,
     QuizResultSerializer,
     QuizSerializer,
     UserSerializer,
@@ -232,8 +234,8 @@ class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Only return courses belonging to the authenticated user.
-        return Course.objects.filter(user=self.request.user)
+        # Only return courses belonging to the authenticated user, newest first.
+        return Course.objects.filter(user=self.request.user).order_by("-created_at")
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -295,6 +297,15 @@ class DocumentListCreateView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DocumentDetailView(APIView):
+    """DELETE /api/documents/<pk>/ — delete a document owned by the user."""
+
+    def delete(self, request, pk):
+        document = get_document_for_user(pk, request.user)
+        document.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DocumentCreateView(APIView):
@@ -581,4 +592,65 @@ class QuizSubmitView(APIView):
 
         # Return the full result serializer so the frontend gets graded answers.
         serializer = QuizResultSerializer(quiz)
+        return Response(serializer.data)
+
+
+class QuizRetakeView(APIView):
+    """
+    POST /api/quizzes/<pk>/retake/ — clone an existing quiz for a new attempt.
+
+    Copies the questions and answer choices from the original quiz into a new
+    Quiz row (score/completion blank). The original and all retakes share a
+    group_id UUID; attempt counts from 1.  No AI call is made.
+    """
+
+    def post(self, request, pk):
+        original = get_quiz_for_user(pk, request.user)
+
+        # Assign a group_id to the original if this is its first retake.
+        if not original.group_id:
+            original.group_id = uuid.uuid4()
+            original.attempt = 1
+            original.save(update_fields=["group_id", "attempt"])
+
+        # Count existing attempts so we can assign the next sequential number.
+        attempt_number = Quiz.objects.filter(group_id=original.group_id).count() + 1
+
+        new_quiz = Quiz.objects.create(
+            document=original.document,
+            difficulty=original.difficulty,
+            class_name=original.class_name,
+            learning_objectives=original.learning_objectives,
+            group_id=original.group_id,
+            attempt=attempt_number,
+        )
+
+        for question in original.questions.all():
+            new_question = QuizQuestion.objects.create(
+                quiz=new_quiz,
+                question_type=question.question_type,
+                question_text=question.question_text,
+            )
+            for choice in question.answer_choices.all():
+                AnswerChoice.objects.create(
+                    question=new_question,
+                    choice_text=choice.choice_text,
+                    is_correct=choice.is_correct,
+                )
+
+        serializer = QuizSerializer(new_quiz)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class CourseQuizHistoryView(APIView):
+    """GET /api/courses/<course_id>/quizzes/ — list all quizzes for a course, newest first."""
+
+    def get(self, request, course_id):
+        get_course_for_user(course_id, request.user)
+        quizzes = (
+            Quiz.objects.filter(document__course_id=course_id, document__course__user=request.user)
+            .select_related("document")
+            .order_by("-created_at")
+        )
+        serializer = QuizHistorySerializer(quizzes, many=True)
         return Response(serializer.data)
