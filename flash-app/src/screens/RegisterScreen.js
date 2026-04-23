@@ -153,8 +153,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoImg: {
-    height: 140,
-    width: 280,
+    height: 280,
+    width: 560,
     marginBottom: 32,
   },
   heroText: {

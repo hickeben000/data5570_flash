@@ -105,7 +105,7 @@ export default function LoginScreen({ navigation }) {
           <Image source={flashLogo} style={styles.logoImg} resizeMode="contain" />
           <Text style={styles.heroText}>Learn in a flash.</Text>
           <Text style={styles.heroSub}>
-            Upload your notes, textbooks, or assignments — and get personalized
+            Upload your notes, textbooks, or assignments, and get personalized
             flashcards and quizzes in seconds.
           </Text>
           <View style={styles.features}>
@@ -167,8 +167,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoImg: {
-    height: 140,
-    width: 280,
+    height: 280,
+    width: 560,
     marginBottom: 32,
   },
   heroText: {
