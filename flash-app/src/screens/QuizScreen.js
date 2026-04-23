@@ -174,7 +174,7 @@ export default function QuizScreen({ route, navigation }) {
                   answer={answers[String(q.id)]}
                   onAnswer={(val) => {
                     setAnswer(q.id, val);
-                    if (i < questions.length - 1)
+                    if (q.question_type === "mc" && i < questions.length - 1)
                       setTimeout(() => setActiveQ(i + 1), 300);
                   }}
                   onPrev={i > 0 ? () => setActiveQ(i - 1) : null}

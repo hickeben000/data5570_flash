@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -7,6 +8,8 @@ import {
   View,
   ScrollView,
 } from "react-native";
+
+const flashLogo = require('../../assets/flash-logo.png');
 import { colors, radius, shadows, spacing } from "../theme";
 
 export default function DocumentActionScreen({ route, navigation }) {
@@ -29,9 +32,7 @@ export default function DocumentActionScreen({ route, navigation }) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Hero */}
       <View style={styles.hero}>
-        <View style={styles.heroIcon}>
-          <Text style={styles.heroIconText}>⚡</Text>
-        </View>
+        <Image source={flashLogo} style={styles.heroLogo} resizeMode="contain" />
         <Text style={styles.heroTitle}>Study Material Ready</Text>
         <Text style={styles.heroSub}>{docLabel}</Text>
       </View>
@@ -114,16 +115,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
   },
-  heroIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+  heroLogo: {
+    width: 200,
+    height: 72,
+    marginBottom: 20,
   },
-  heroIconText: { fontSize: 32 },
   heroTitle: {
     fontSize: 26,
     fontWeight: '800',

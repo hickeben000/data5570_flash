@@ -239,15 +239,22 @@ const styles = StyleSheet.create({
   sidebarContainer: {
     flex: 1,
     flexDirection: 'column',
+    overflow: "visible",
   },
   sidebarLogoArea: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
     paddingTop: 24,
-    paddingBottom: 16,
+    paddingBottom: 28,
+    height: 190,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "visible",
   },
   sidebarLogoImg: {
-    height: 36,
-    width: 120,
+    height: 48,
+    width: 160,
+    transform: [{ scale: 2.6 }],
+    alignSelf: "center",
   },
   sidebarNav: {
     flex: 1,
