@@ -22,6 +22,7 @@ import FlashcardScreen from "../screens/FlashcardScreen";
 import QuizConfigScreen from "../screens/QuizConfigScreen";
 import QuizScreen from "../screens/QuizScreen";
 import QuizResultsScreen from "../screens/QuizResultsScreen";
+import QuizHistoryScreen from "../screens/QuizHistoryScreen";
 import { logoutUser, restoreSession } from "../store/authSlice";
 
 const Drawer = createDrawerNavigator();
@@ -125,6 +126,11 @@ function AuthenticatedNavigator() {
         name="QuizResults"
         component={QuizResultsScreen}
         options={{ title: "Results" }}
+      />
+      <Stack.Screen
+        name="QuizHistory"
+        component={QuizHistoryScreen}
+        options={{ title: "Quiz History" }}
       />
     </Stack.Navigator>
   );

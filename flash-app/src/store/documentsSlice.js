@@ -41,6 +41,18 @@ export const fetchDocuments = createAsyncThunk(
   }
 );
 
+export const deleteDocument = createAsyncThunk(
+  "documents/delete",
+  async (documentId, { rejectWithValue }) => {
+    try {
+      await api.delete(`/documents/${documentId}/`);
+      return documentId;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Failed to delete document");
+    }
+  }
+);
+
 export const createDocument = createAsyncThunk(
   "documents/create",
   async ({ course, title, rawText, file }, { rejectWithValue }) => {
@@ -109,6 +121,12 @@ const documentsSlice = createSlice({
       })
       .addCase(createDocument.rejected, (state, action) => {
         state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteDocument.fulfilled, (state, action) => {
+        state.documents = state.documents.filter((d) => d.id !== action.payload);
+      })
+      .addCase(deleteDocument.rejected, (state, action) => {
         state.error = action.payload;
       });
   },

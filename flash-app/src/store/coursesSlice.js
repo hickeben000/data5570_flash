@@ -13,6 +13,18 @@ export const fetchCourses = createAsyncThunk(
   }
 );
 
+export const deleteCourse = createAsyncThunk(
+  "courses/delete",
+  async (courseId, { rejectWithValue }) => {
+    try {
+      await api.delete(`/courses/${courseId}/`);
+      return courseId;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Failed to delete course");
+    }
+  }
+);
+
 export const createCourse = createAsyncThunk(
   "courses/create",
   async ({ name }, { rejectWithValue }) => {
@@ -57,10 +69,16 @@ const coursesSlice = createSlice({
       })
       .addCase(createCourse.fulfilled, (state, action) => {
         state.loading = false;
-        state.courses.push(action.payload);
+        state.courses.unshift(action.payload);
       })
       .addCase(createCourse.rejected, (state, action) => {
         state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteCourse.fulfilled, (state, action) => {
+        state.courses = state.courses.filter((c) => c.id !== action.payload);
+      })
+      .addCase(deleteCourse.rejected, (state, action) => {
         state.error = action.payload;
       });
   },

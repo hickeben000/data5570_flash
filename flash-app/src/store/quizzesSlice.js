@@ -60,6 +60,30 @@ export const fetchQuiz = createAsyncThunk(
   }
 );
 
+export const fetchCourseQuizHistory = createAsyncThunk(
+  "quizzes/fetchHistory",
+  async (courseId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/courses/${courseId}/quizzes/`);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Failed to fetch quiz history");
+    }
+  }
+);
+
+export const retakeQuiz = createAsyncThunk(
+  "quizzes/retake",
+  async (quizId, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/quizzes/${quizId}/retake/`);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Failed to create retake");
+    }
+  }
+);
+
 export const submitQuiz = createAsyncThunk(
   "quizzes/submit",
   async ({ quizId, answers }, { rejectWithValue, getState }) => {
@@ -92,6 +116,9 @@ const quizzesSlice = createSlice({
     quiz: null,
     loading: false,
     error: null,
+    history: [],
+    historyLoading: false,
+    historyError: null,
   },
   reducers: {
     clearQuizError(state) {
@@ -135,6 +162,30 @@ const quizzesSlice = createSlice({
       .addCase(submitQuiz.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      .addCase(retakeQuiz.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(retakeQuiz.fulfilled, (state, action) => {
+        state.loading = false;
+        state.quiz = action.payload;
+      })
+      .addCase(retakeQuiz.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchCourseQuizHistory.pending, (state) => {
+        state.historyLoading = true;
+        state.historyError = null;
+      })
+      .addCase(fetchCourseQuizHistory.fulfilled, (state, action) => {
+        state.historyLoading = false;
+        state.history = action.payload;
+      })
+      .addCase(fetchCourseQuizHistory.rejected, (state, action) => {
+        state.historyLoading = false;
+        state.historyError = action.payload;
       });
   },
 });

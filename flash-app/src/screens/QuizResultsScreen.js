@@ -4,11 +4,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 
-import { fetchQuiz } from "../store/quizzesSlice";
+import { fetchQuiz, retakeQuiz } from "../store/quizzesSlice";
 import formatError from "../utils/formatError";
 
 function getCorrectAnswerText(question) {
@@ -31,10 +32,18 @@ function getUserAnswerText(question) {
   return question.user_answer || "(no answer)";
 }
 
-export default function QuizResultsScreen({ route }) {
+export default function QuizResultsScreen({ route, navigation }) {
   const { quizId } = route.params;
   const dispatch = useDispatch();
   const { quiz, loading, error } = useSelector((state) => state.quizzes);
+
+  const handleRetake = () => {
+    dispatch(retakeQuiz(quizId)).then((action) => {
+      if (action.meta.requestStatus === "fulfilled") {
+        navigation.replace("Quiz", { quizId: action.payload.id });
+      }
+    });
+  };
 
   useEffect(() => {
     const hasLoadedResults =
@@ -73,6 +82,19 @@ export default function QuizResultsScreen({ route }) {
         Score: {quiz.score != null ? `${quiz.score.toFixed(1)}%` : "N/A"}
       </Text>
       {error ? <Text style={styles.error}>{formatError(error)}</Text> : null}
+
+      <TouchableOpacity
+        style={styles.retakeBtn}
+        onPress={handleRetake}
+        disabled={loading}
+        accessibilityLabel="Retake Quiz"
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.retakeBtnText}>Retake Quiz</Text>
+        )}
+      </TouchableOpacity>
 
       {questions.map((question, index) => (
         <View
@@ -130,6 +152,18 @@ const styles = StyleSheet.create({
   error: {
     color: "#c0392b",
     marginBottom: 12,
+  },
+  retakeBtn: {
+    backgroundColor: "#4361ee",
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  retakeBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
   },
   questionBlock: {
     borderRadius: 14,

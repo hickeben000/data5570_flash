@@ -82,6 +82,11 @@ class Quiz(models.Model):
     class_name = models.CharField(max_length=255, blank=True, default="")
     learning_objectives = models.TextField(blank=True, default="")
 
+    # Retake grouping: all attempts at the same quiz share a group_id UUID.
+    # attempt counts from 1. group_id is null for standalone (never-retaken) quizzes.
+    group_id = models.UUIDField(null=True, blank=True, db_index=True)
+    attempt = models.PositiveIntegerField(default=1)
+
     class Meta:
         verbose_name_plural = "quizzes"
 

@@ -143,9 +143,11 @@ class QuizSerializer(serializers.ModelSerializer):
             "score",
             "created_at",
             "completed_at",
+            "group_id",
+            "attempt",
             "questions",
         ]
-        read_only_fields = ["id", "score", "created_at", "completed_at"]
+        read_only_fields = ["id", "score", "created_at", "completed_at", "group_id", "attempt"]
 
 
 class QuizResultSerializer(serializers.ModelSerializer):
@@ -162,6 +164,27 @@ class QuizResultSerializer(serializers.ModelSerializer):
             "score",
             "created_at",
             "completed_at",
+            "group_id",
+            "attempt",
             "questions",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "group_id", "attempt"]
+
+
+class QuizHistorySerializer(serializers.ModelSerializer):
+    document_title = serializers.CharField(source="document.title", read_only=True)
+
+    class Meta:
+        model = Quiz
+        fields = [
+            "id",
+            "document",
+            "document_title",
+            "difficulty",
+            "score",
+            "created_at",
+            "completed_at",
+            "group_id",
+            "attempt",
+        ]
+        read_only_fields = fields
